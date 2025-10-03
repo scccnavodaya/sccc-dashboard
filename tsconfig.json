@@ -14,7 +14,10 @@
     "jsx": "preserve",
     "incremental": true,
 
+    // 👇 Base directory for imports
     "baseUrl": ".",
+
+    // 👇 Path aliases (keep in sync with your folder structure)
     "paths": {
       "@/*": ["./*"],
       "@/app/*": ["./app/*"],
@@ -25,8 +28,19 @@
       "@/public/*": ["./public/*"]
     },
 
-    "plugins": [{ "name": "next" }]
+    // 👇 Next.js plugin for type checks
+    "plugins": [
+      { "name": "next" }
+    ]
   },
-  "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", ".next"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
 }
