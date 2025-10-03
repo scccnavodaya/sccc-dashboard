@@ -1,11 +1,15 @@
 // app/admin/layout.tsx
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AdminHeader from "@/components/AdminHeader";
-import AdminFooter from "../../components/AdminFooter";
+import AdminFooter from "@/components/AdminFooter";
 
-// same util you used on public page to start in IST month
+// Use the same desktop baseline width you designed for.
+const DESIGN_WIDTH = 1200;
+
+// Start month in IST (same helper you used before)
 function ymNowIST() {
   const now = new Date();
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -19,22 +23,76 @@ function ymNowIST() {
 }
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  // Admin header needs month + onMonthChange props
   const [month, setMonth] = useState<string>(() => ymNowIST());
 
+  // Canvas scaling (same as public)
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
+  const [canvasH, setCanvasH] = useState<number | null>(null);
+
+  useEffect(() => {
+    function recalc() {
+      const vw = window.innerWidth;
+      const s = Math.min(1, vw / DESIGN_WIDTH);
+      setScale(s);
+    }
+    recalc();
+    window.addEventListener("resize", recalc);
+    return () => window.removeEventListener("resize", recalc);
+  }, []);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ro = new ResizeObserver(() => {
+      const h = canvasRef.current?.offsetHeight ?? 0;
+      setCanvasH(h);
+    });
+    ro.observe(canvasRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const wrapStyle = useMemo<React.CSSProperties>(() => {
+    const h = canvasH ? Math.ceil(canvasH * scale) : undefined;
+    return {
+      minHeight: "100svh",
+      overflowX: "hidden",
+      display: "flex",
+      justifyContent: "center",
+      background: "#f8fafc", // zinc-50-ish
+      paddingTop: "env(safe-area-inset-top)",
+      paddingBottom: "env(safe-area-inset-bottom)",
+      height: h,
+    };
+  }, [canvasH, scale]);
+
+  const canvasStyle = useMemo<React.CSSProperties>(() => {
+    return {
+      width: DESIGN_WIDTH,
+      transform: `scale(${scale})`,
+      transformOrigin: "top center",
+      willChange: "transform",
+    };
+  }, [scale]);
+
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50 text-zinc-900">
-      {/* Fixed header (like public) */}
-      <AdminHeader month={month} onMonthChange={setMonth} />
+    <div className="admin-viewport" ref={wrapRef} style={wrapStyle}>
+      <div className="admin-canvas flex min-h-screen flex-col" ref={canvasRef} style={canvasStyle}>
+        {/* Fixed header in your design — keep spacer to prevent overlap */}
+        <AdminHeader month={month} onMonthChange={setMonth} />
+        <div className="h-14 sm:h-16 lg:h-20" />
 
-      {/* Spacer so content doesn't hide under fixed header */}
-      <div className="h-[128px]" />
+        {/* Main content area: keep your preferred max width */}
+        <main className="flex-1 mx-auto w-full max-w-screen-xl min-w-0 px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          {children}
+        </main>
 
-      <main className="flex-1 pb-8 mx-auto max-w-6xl w-full px-3 sm:px-4 py-6">
-        {children}
-      </main>
-
-      <AdminFooter />
+        <div className="border-t">
+          <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8 py-4">
+            <AdminFooter />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
