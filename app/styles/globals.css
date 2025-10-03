@@ -1,0 +1,26 @@
+/* Google fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Playfair+Display:wght@600&display=swap');
+
+/* Tailwind layers */
+@import "tailwindcss/preflight";
+@import "tailwindcss/utilities";
+
+html, body {
+  font-family: 'Poppins', sans-serif;
+  color: #0a0a0a;
+  background: #ffffff;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+}
+
+/* Gradient branding title */
+.brand-title {
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  background: linear-gradient(90deg, #10b981, #14b8a6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
