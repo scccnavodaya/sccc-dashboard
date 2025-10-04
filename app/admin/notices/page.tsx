@@ -1,3 +1,4 @@
+// app/admin/notices/page.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,27 +36,29 @@ function classNames(...a: (string | false | null | undefined)[]) {
 }
 
 export default function AdminNoticesPage() {
+  // form state
   const [tab, setTab] = useState<Kind>("image");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [isLive, setIsLive] = useState(true);
   const [file, setFile] = useState<File | null>(null);
 
-  // image cropping
+  // image crop
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
-  // video poster capture
+  // video poster
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [posterBlob, setPosterBlob] = useState<Blob | null>(null);
 
+  // ui/meta
   const [uploading, setUploading] = useState(false);
   const [banner, setBanner] = useState<Banner>(null);
 
-  // recent list
+  // recent
   const [recent, setRecent] = useState<NoticeRow[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -74,7 +77,6 @@ export default function AdminNoticesPage() {
     setCroppedAreaPixels(null);
   }
 
-  // generate cropped image blob via canvas
   async function getCroppedImageBlob(): Promise<Blob> {
     if (!imgUrl || !croppedAreaPixels) throw new Error("Nothing to crop");
     const img = await loadImage(imgUrl);
@@ -105,9 +107,8 @@ export default function AdminNoticesPage() {
     if (!videoRef.current) throw new Error("No video");
     const v = videoRef.current;
     const canvas = document.createElement("canvas");
-    // fit to aspect without stretching
-    canvas.width = v.videoWidth;
-    canvas.height = v.videoHeight;
+    canvas.width = v.videoWidth || 1280;
+    canvas.height = v.videoHeight || 720;
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
     return await new Promise<Blob>((resolve, reject) =>
@@ -143,13 +144,11 @@ export default function AdminNoticesPage() {
     if (tab === "image") {
       const url = URL.createObjectURL(f);
       setImgUrl(url);
-      // reset any old video state
       setVideoUrl(null);
       setPosterBlob(null);
     } else {
       const url = URL.createObjectURL(f);
       setVideoUrl(url);
-      // reset image state
       setImgUrl(null);
       setCroppedAreaPixels(null);
       setZoom(1);
@@ -177,16 +176,16 @@ export default function AdminNoticesPage() {
       let mainFile: File = file;
 
       if (tab === "image") {
-        // crop first
         if (imgUrl && croppedAreaPixels) {
           const blob = await getCroppedImageBlob();
-          mainFile = new File([blob], file.name.replace(/\.\w+$/, "") + "_cropped.jpg", {
-            type: "image/jpeg",
-          });
+          mainFile = new File(
+            [blob],
+            file.name.replace(/\.\w+$/, "") + "_cropped.jpg",
+            { type: "image/jpeg" }
+          );
         }
         form.append("file", mainFile);
       } else {
-        // video: also attach a poster (either captured or previously captured)
         form.append("file", mainFile);
         let poster = posterBlob;
         if (!poster && videoRef.current && videoRef.current.readyState >= 2) {
@@ -199,7 +198,7 @@ export default function AdminNoticesPage() {
 
       const res = await fetch("/api/admin/notices", {
         method: "POST",
-        body: form, // ✅ FormData (no manual content-type!)
+        body: form,
         credentials: "include",
       });
       const data = await res.json().catch(() => ({}));
@@ -219,7 +218,10 @@ export default function AdminNoticesPage() {
   async function doDelete(id: string) {
     setBanner(null);
     try {
-      const r = await fetch(`/api/admin/notices/${id}`, { method: "DELETE", credentials: "include" });
+      const r = await fetch(`/api/admin/notices/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Delete failed");
       setConfirmDeleteId(null);
@@ -230,21 +232,21 @@ export default function AdminNoticesPage() {
     }
   }
 
-  const top3 = recent.slice(0, 3);
-  const older = recent.slice(3);
+  const top3 = useMemo(() => recent.slice(0, 3), [recent]);
+  const older = useMemo(() => recent.slice(3), [recent]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-4">
+    <div className="safe-x mx-auto w-full max-w-screen-xl px-3 sm:px-4 lg:px-6 py-4">
       {/* Top bar */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Link
             href="/admin"
             className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
           >
             <ArrowLeft size={16} /> Back to Dashboard
           </Link>
-          <h2 className="text-xl font-semibold">Notices</h2>
+          <h2 className="text-lg sm:text-xl font-semibold truncate">Notices</h2>
         </div>
       </div>
 
@@ -261,15 +263,20 @@ export default function AdminNoticesPage() {
                 ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border border-red-200 bg-red-50 text-red-700"
             )}
+            aria-live="polite"
           >
             {banner.msg}
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* Two columns on md+, stacked on mobile */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* LEFT: upload form */}
-        <form onSubmit={handleUpload} className="rounded-2xl border bg-white p-4 shadow-sm">
+        <form
+          onSubmit={handleUpload}
+          className="rounded-2xl border bg-white p-4 shadow-sm"
+        >
           {/* kind tabs */}
           <div className="mb-4 inline-flex rounded-full border p-1">
             <button
@@ -279,6 +286,7 @@ export default function AdminNoticesPage() {
                 "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm",
                 tab === "image" ? "bg-emerald-600 text-white" : "text-zinc-700 hover:bg-zinc-50"
               )}
+              aria-pressed={tab === "image"}
             >
               <ImageIcon size={16} />
               Image
@@ -290,6 +298,7 @@ export default function AdminNoticesPage() {
                 "ml-1 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm",
                 tab === "video" ? "bg-emerald-600 text-white" : "text-zinc-700 hover:bg-zinc-50"
               )}
+              aria-pressed={tab === "video"}
             >
               <VideoIcon size={16} />
               Video
@@ -303,7 +312,7 @@ export default function AdminNoticesPage() {
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
                 placeholder="e.g., Holiday on Friday"
               />
             </div>
@@ -312,15 +321,22 @@ export default function AdminNoticesPage() {
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
                 rows={3}
                 placeholder="Short description…"
               />
             </div>
 
             <div className="flex items-center gap-2">
-              <input id="isLive" type="checkbox" checked={isLive} onChange={(e) => setIsLive(e.target.checked)} />
-              <label htmlFor="isLive" className="text-sm">Publish immediately</label>
+              <input
+                id="isLive"
+                type="checkbox"
+                checked={isLive}
+                onChange={(e) => setIsLive(e.target.checked)}
+              />
+              <label htmlFor="isLive" className="text-sm">
+                Publish immediately
+              </label>
             </div>
 
             {/* picker */}
@@ -328,7 +344,7 @@ export default function AdminNoticesPage() {
               <label className="text-xs text-zinc-600">
                 {tab === "image" ? "Pick an image" : "Pick a video"}
               </label>
-              <div className="mt-1 flex items-center gap-2">
+              <div className="mt-1 flex flex-col sm:flex-row items-start sm:items-center gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border px-3 py-2 text-sm hover:bg-zinc-50">
                   <Upload size={16} />
                   Choose file
@@ -339,13 +355,13 @@ export default function AdminNoticesPage() {
                     onChange={(e) => onChooseFile(e.target.files?.[0] ?? null)}
                   />
                 </label>
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-zinc-500 break-all">
                   {file ? file.name : "No file chosen"}
                 </span>
               </div>
             </div>
 
-            {/* image cropper or video preview */}
+            {/* image cropper */}
             {tab === "image" && imgUrl && (
               <div className="relative mt-2 h-56 w-full overflow-hidden rounded-lg border">
                 <Cropper
@@ -360,6 +376,7 @@ export default function AdminNoticesPage() {
                 />
                 <div className="absolute bottom-2 left-2 right-2">
                   <input
+                    aria-label="Zoom"
                     type="range"
                     min={1}
                     max={3}
@@ -372,6 +389,7 @@ export default function AdminNoticesPage() {
               </div>
             )}
 
+            {/* video preview */}
             {tab === "video" && videoUrl && (
               <div className="mt-2 space-y-2">
                 <video
@@ -383,26 +401,36 @@ export default function AdminNoticesPage() {
                     try {
                       const poster = await captureVideoPoster();
                       setPosterBlob(poster);
-                    } catch { /* ignore */ }
+                    } catch {
+                      /* ignore */
+                    }
                   }}
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={async () => {
                       try {
                         const p = await captureVideoPoster();
                         setPosterBlob(p);
-                        setBanner({ type: "success", msg: "Poster captured from current frame." });
+                        setBanner({
+                          type: "success",
+                          msg: "Poster captured from current frame.",
+                        });
                       } catch (e: any) {
-                        setBanner({ type: "error", msg: e?.message || "Could not capture poster." });
+                        setBanner({
+                          type: "error",
+                          msg: e?.message || "Could not capture poster.",
+                        });
                       }
                     }}
                     className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
                   >
                     Capture Poster
                   </button>
-                  {posterBlob && <span className="text-xs text-zinc-600">Poster ready</span>}
+                  {posterBlob && (
+                    <span className="text-xs text-zinc-600">Poster ready</span>
+                  )}
                 </div>
               </div>
             )}
@@ -420,7 +448,7 @@ export default function AdminNoticesPage() {
           </div>
         </form>
 
-        {/* RIGHT: compact recent + dropdown for older */}
+        {/* RIGHT: recent list */}
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <div className="mb-2 text-base font-semibold">Recent Notices</div>
 
@@ -433,26 +461,36 @@ export default function AdminNoticesPage() {
                 </div>
               ))
             ) : top3.length === 0 ? (
-              <div className="rounded-lg border p-4 text-sm text-zinc-500">No notices yet</div>
+              <div className="rounded-lg border p-4 text-sm text-zinc-500">
+                No notices yet
+              </div>
             ) : (
               top3.map((n) => (
                 <div key={n.id} className="rounded-lg border p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 text-sm font-medium truncate">
                       {n.title || (n.kind === "image" ? "Image" : "Video")}
                     </div>
                     <span
                       className={classNames(
-                        "rounded-full px-2 py-[2px] text-[10px] font-semibold",
-                        n.is_live ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"
+                        "shrink-0 rounded-full px-2 py-[2px] text-[10px] font-semibold",
+                        n.is_live
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-zinc-200 text-zinc-700"
                       )}
                     >
                       {n.is_live ? "LIVE" : "Hidden"}
                     </span>
                   </div>
-                  {n.body && <div className="mt-1 text-xs text-zinc-600">{n.body}</div>}
+                  {n.body && (
+                    <div className="mt-1 text-xs text-zinc-600 break-words">
+                      {n.body}
+                    </div>
+                  )}
                   <div className="mt-2 flex items-center justify-between text-xs text-zinc-500">
-                    <div>{new Date(n.created_at).toLocaleString()}</div>
+                    <div className="truncate">
+                      {new Date(n.created_at).toLocaleString()}
+                    </div>
                     <div className="flex items-center gap-2">
                       {confirmDeleteId === n.id ? (
                         <>
@@ -483,13 +521,14 @@ export default function AdminNoticesPage() {
               ))
             )}
 
-            {/* Older (dropdown) */}
+            {/* Older (accordion) */}
             {older.length > 0 && (
-              <div className="rounded-xl border">
+              <div className="rounded-xl border overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setShowOlder((v) => !v)}
                   className="flex w-full items-center justify-between px-3 py-2 text-sm"
+                  aria-expanded={showOlder}
                 >
                   <span>Older</span>
                   {showOlder ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -505,22 +544,30 @@ export default function AdminNoticesPage() {
                       <div className="space-y-2">
                         {older.map((n) => (
                           <div key={n.id} className="rounded-lg border p-3">
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm font-medium">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0 text-sm font-medium truncate">
                                 {n.title || (n.kind === "image" ? "Image" : "Video")}
                               </div>
                               <span
                                 className={classNames(
-                                  "rounded-full px-2 py-[2px] text-[10px] font-semibold",
-                                  n.is_live ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"
+                                  "shrink-0 rounded-full px-2 py-[2px] text-[10px] font-semibold",
+                                  n.is_live
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-zinc-200 text-zinc-700"
                                 )}
                               >
                                 {n.is_live ? "LIVE" : "Hidden"}
                               </span>
                             </div>
-                            {n.body && <div className="mt-1 text-xs text-zinc-600">{n.body}</div>}
+                            {n.body && (
+                              <div className="mt-1 text-xs text-zinc-600 break-words">
+                                {n.body}
+                              </div>
+                            )}
                             <div className="mt-2 flex items-center justify-between text-xs text-zinc-500">
-                              <div>{new Date(n.created_at).toLocaleString()}</div>
+                              <div className="truncate">
+                                {new Date(n.created_at).toLocaleString()}
+                              </div>
                               <div className="flex items-center gap-2">
                                 {confirmDeleteId === n.id ? (
                                   <>

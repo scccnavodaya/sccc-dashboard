@@ -46,16 +46,13 @@ function Chip({ children, active }: { children: React.ReactNode; active?: boolea
 }
 
 /* ===============================================================
-   Scoring (public result display) — NEW (non-breaking) UTILITIES
-   Usage example:
-     const s = computeScore({ totalQuestions: 40, wrongAnswers: 4, marksPerQuestion: 1.25 });
-     // s.display === "45/50"
+   Scoring utils (unchanged)
    =============================================================== */
 
 export type ScoreInput = {
-  totalQuestions: number;     // e.g. 40
-  wrongAnswers: number;       // e.g. 4
-  marksPerQuestion: number;   // e.g. 1.25  (=> 40 * 1.25 = 50 max)
+  totalQuestions: number;
+  wrongAnswers: number;
+  marksPerQuestion: number;
 };
 
 export function computeScore({ totalQuestions, wrongAnswers, marksPerQuestion }: ScoreInput) {
@@ -64,8 +61,8 @@ export function computeScore({ totalQuestions, wrongAnswers, marksPerQuestion }:
   const mpq = Number(marksPerQuestion) || 0;
 
   const correct = Math.max(0, tq - wa);
-  const maxMarks = tq * mpq;          // 40 * 1.25 = 50
-  const obtained = correct * mpq;     // 36 * 1.25 = 45
+  const maxMarks = tq * mpq;
+  const obtained = correct * mpq;
   const percent = maxMarks > 0 ? (obtained / maxMarks) * 100 : 0;
 
   return {
@@ -74,7 +71,7 @@ export function computeScore({ totalQuestions, wrongAnswers, marksPerQuestion }:
     maxMarks,
     obtained,
     percent: Number(percent.toFixed(2)),
-    display: `${obtained}/${maxMarks}`, // "45/50"
+    display: `${obtained}/${maxMarks}`,
   };
 }
 
@@ -328,7 +325,7 @@ function CropModal({
   );
 }
 
-/* ========================= PhotoUploader (crop + replace) ========================= */
+/* ========================= PhotoUploader (unchanged logic) ========================= */
 
 function PhotoUploader({
   studentId,
@@ -366,7 +363,7 @@ function PhotoUploader({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Upload failed");
-      onDone(`${data.url}?v=${Date.now()}`); // cache-bust
+      onDone(`${data.url}?v=${Date.now()}`);
     } catch (err: any) {
       alert(err?.message || "Upload failed");
     } finally {
@@ -467,7 +464,7 @@ export default function StudentsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to add");
-      setStudents((list) => [...list, data as Student]); // append → first added first
+      setStudents((list) => [...list, data as Student]);
       setName("");
     } catch (e: any) {
       alert(e?.message || "Failed to add");
@@ -509,10 +506,7 @@ export default function StudentsPage() {
     }
   }
 
-  // open nice dialog instead of window.confirm
-  function askDelete(s: Student) {
-    setToDelete(s);
-  }
+  function askDelete(s: Student) { setToDelete(s); }
 
   async function reallyDelete() {
     if (!toDelete) return;
@@ -566,18 +560,17 @@ export default function StudentsPage() {
     await rename(s.id, v);
   }
 
-  // === constants for "4-row fixed window" ===
-  const LIST_BODY_4ROWS = "h-[224px]"; // 4 * 56px rows
-  const ROW_HEIGHT_CLASS = "h-14";     // each row = 56px
+  // === fixed window ===
+  const LIST_BODY_4ROWS = "h-[224px]";
+  const ROW_HEIGHT_CLASS = "h-14";
 
-  // row animation variants
   const rowVariants = {
     hidden: { opacity: 0, y: 6 },
     show:   { opacity: 1, y: 0, transition: { duration: 0.18 } },
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-2 md:py-4">
+    <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-3 md:py-4">
       {/* Top bar */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -587,7 +580,7 @@ export default function StudentsPage() {
           >
             <ArrowLeft size={16} /> Back to Dashboard
           </Link>
-          <h2 className="text-xl font-semibold">Students</h2>
+          <h2 className="text-lg sm:text-xl font-semibold">Students</h2>
         </div>
         <div className="flex items-center gap-2">
           <Chip active>{activeCount} active</Chip>
@@ -609,7 +602,8 @@ export default function StudentsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search students…"
-            className="w-56 rounded-md border border-zinc-300 py-1.5 pl-7 pr-2 text-sm outline-none transition focus:ring-2 focus:ring-emerald-300"
+            className="w-[65vw] max-w-xs sm:max-w-none sm:w-64 md:w-72 rounded-md border border-zinc-300 py-1.5 pl-7 pr-2 text-sm outline-none transition focus:ring-2 focus:ring-emerald-300"
+            aria-label="Search students"
           />
         </div>
         <div className="inline-flex items-center gap-1">
@@ -622,6 +616,7 @@ export default function StudentsPage() {
               className={`rounded-full px-3 py-1 text-sm transition ${
                 status === k ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
               }`}
+              aria-pressed={status === k}
             >
               {k[0].toUpperCase()+k.slice(1)}
             </motion.button>
@@ -659,7 +654,7 @@ export default function StudentsPage() {
               <button
                 type="submit"
                 disabled={saving || !name.trim()}
-                className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60"
+                className="h-9 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60"
               >
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -674,8 +669,10 @@ export default function StudentsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: 0.05 }}
         >
-          <div className="overflow-x-auto">
-            <div className="min-w-[980px]">
+          {/* Horizontal scroll on small screens only */}
+          <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
+            {/* keep a sane min width so columns don't squish on mobile */}
+            <div className="min-w-[920px]">
               <div className="sticky top-0 z-10 border-b bg-zinc-50/80 px-3 py-2 backdrop-blur">
                 <div className="grid grid-cols-[56px_64px_minmax(220px,1fr)_120px_140px_180px] items-center gap-2 text-xs font-medium text-zinc-600">
                   <div>#</div>
@@ -687,8 +684,11 @@ export default function StudentsPage() {
                 </div>
               </div>
 
-              {/* === FIXED 4-ROW WINDOW + VERTICAL SCROLL === */}
-              <div className={`${LIST_BODY_4ROWS} overflow-y-auto`}>
+              {/* Fixed 4-row window with vertical scroll */}
+              <div
+                className={`${LIST_BODY_4ROWS} overflow-y-auto overscroll-contain touch-pan-y`}
+                aria-label="Students list"
+              >
                 {loading ? (
                   <div className="p-3">
                     {Array.from({ length: 4 }).map((_, i) => (
@@ -797,7 +797,7 @@ export default function StudentsPage() {
                   </AnimatePresence>
                 )}
               </div>
-              {/* === /FIXED WINDOW === */}
+              {/* /fixed window */}
             </div>
           </div>
         </motion.div>
@@ -818,7 +818,7 @@ export default function StudentsPage() {
         onCancel={() => (deleting ? null : setToDelete(null))}
       />
 
-      {err && <div className="mt-3 text-sm text-red-600">{err}</div>}
+      {err && <div className="mt-3 text-sm text-red-600" aria-live="polite">{err}</div>}
     </div>
   );
 }

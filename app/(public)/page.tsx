@@ -317,23 +317,9 @@ export default function HomePage() {
     [liveMarks]
   );
 
-  // Layout
-  const CARD_H = "md:h-[240px]";
-  const GRID_BODY_H = "h-[180px]";
-  const needScroll = currentSectionRows.length > 4;
-  const gridBodyClass = needScroll
-    ? `${GRID_BODY_H} overflow-y-auto pr-1`
-    : `${GRID_BODY_H} overflow-y-hidden`;
-
-  // Header label (actual date shown)
-  const sectionHeaderDateLabel = useMemo(() => {
-    if (!sectionForDropdown) return "";
-    if (selectedTestId) {
-      const t = liveTests.find((x) => x.id === selectedTestId);
-      return t ? labelForDate(t.test_date) : "—";
-    }
-    return "—";
-  }, [sectionForDropdown, selectedTestId, liveTests]);
+  // Layout helpers
+  const CARD_CLASS =
+    "rounded-2xl border bg-white p-3 flex flex-col min-w-0 " + activeTheme.border;
 
   return (
     <GradientBackground
@@ -352,163 +338,181 @@ export default function HomePage() {
         }}
       />
 
-      <div className="h-[112px]" />
+      {/* Spacer for fixed header (slightly shorter on very small phones) */}
+      <div className="h-[96px] sm:h-[112px]" />
 
-      <div className="mx-auto max-w-6xl px-4 py-5">
-        <StatCards
-          stats={stats}
-          softBgClass={activeTheme.pill}
-          primaryTextClass={activeTheme.text}
-        />
+      <div className="mobile-rescue">
+        <div className="mx-auto w-full max-w-screen-xl px-3 sm:px-4 lg:px-6 py-5">
+          <div className="w-full max-w-full min-w-0">
+            <StatCards
+              stats={stats}
+              softBgClass={activeTheme.pill}
+              primaryTextClass={activeTheme.text}
+            />
 
-        <div className="mt-3">
-          <ChipBar
-            active={section}
-            onChange={(k) => {
-              setSection(k);
-              setDateOpt("ALL");
-            }}
-            colorByKey={{
-              OVERALL: {
-                pill: colorMap.OVERALL.pill,
-                text: colorMap.OVERALL.text,
-              },
-              MAT: { pill: colorMap.MAT.pill, text: colorMap.MAT.text },
-              ENGLISH: {
-                pill: colorMap.ENGLISH.pill,
-                text: colorMap.ENGLISH.text,
-              },
-              MATHS: {
-                pill: colorMap.MATHS.pill,
-                text: colorMap.MATHS.text,
-              },
-              FEEDBACK: {
-                pill: colorMap.OVERALL.pill,
-                text: colorMap.OVERALL.text,
-              },
-            }}
-          />
-        </div>
-
-        {section === "FEEDBACK" ? (
-          <div className="mt-3 rounded-2xl border border-emerald-200 bg-white p-4">
-            <h3 className="text-lg font-semibold">Parent Feedback</h3>
-            <p className="mt-1 text-sm text-zinc-500">
-              Tap the button below to open the feedback form.
-            </p>
             <div className="mt-3">
-              <Link
-                href="/feedback"
-                className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-              >
-                Open Feedback Form
-              </Link>
+              <ChipBar
+                active={section}
+                onChange={(k) => {
+                  setSection(k);
+                  setDateOpt("ALL");
+                }}
+                colorByKey={{
+                  OVERALL: {
+                    pill: colorMap.OVERALL.pill,
+                    text: colorMap.OVERALL.text,
+                  },
+                  MAT: { pill: colorMap.MAT.pill, text: colorMap.MAT.text },
+                  ENGLISH: {
+                    pill: colorMap.ENGLISH.pill,
+                    text: colorMap.ENGLISH.text,
+                  },
+                  MATHS: {
+                    pill: colorMap.MATHS.pill,
+                    text: colorMap.MATHS.text,
+                  },
+                  FEEDBACK: {
+                    pill: colorMap.OVERALL.pill,
+                    text: colorMap.OVERALL.text,
+                  },
+                }}
+              />
             </div>
-          </div>
-        ) : (
-          <>
-            {sectionForDropdown && (
-              <div className="mt-2">
-                <DateDropdown
-                  label="Date"
-                  value={dateOpt}
-                  onChange={setDateOpt}
-                  options={
-                    dateOptionsBySection[sectionForDropdown] ?? [
-                      { value: "ALL", label: "All dates" },
-                    ]
-                  }
-                />
+
+            {section === "FEEDBACK" ? (
+              <div className="mt-3 rounded-2xl border border-emerald-200 bg-white p-4">
+                <h3 className="text-base sm:text-lg font-semibold">Parent Feedback</h3>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Tap the button below to open the feedback form.
+                </p>
+                <div className="mt-3">
+                  <Link
+                    href="/feedback"
+                    className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    Open Feedback Form
+                  </Link>
+                </div>
               </div>
+            ) : (
+              <>
+                {sectionForDropdown && (
+                  <div className="mt-2">
+                    <DateDropdown
+                      label="Date"
+                      value={dateOpt}
+                      onChange={setDateOpt}
+                      options={
+                        dateOptionsBySection[sectionForDropdown] ?? [
+                          { value: "ALL", label: "All dates" },
+                        ]
+                      }
+                    />
+                  </div>
+                )}
+
+                {/* Side-by-side on md+, stacked on mobile. Both cards flex and their content scrolls. */}
+                <div className="mt-3 flex flex-col md:flex-row items-stretch gap-4 md:gap-5 min-w-0">
+                  {/* LEFT: Section / Overall */}
+                  <motion.div
+                    key={`left-${section}-${dateOpt}-${month}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    className={CARD_CLASS}
+                    style={{ minHeight: "220px" }}
+                  >
+                    <AnimatePresence mode="wait">
+                      {section === "OVERALL" ? (
+                        <motion.div
+                          key="overall"
+                          className="flex min-h-0 flex-1 flex-col"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <h3 className="text-base font-semibold truncate">
+                              Overall Leaderboard — {month}
+                            </h3>
+                            <span className="text-[11px] text-zinc-500 shrink-0">
+                              Sums scores across all published tests
+                            </span>
+                          </div>
+                          <div className="min-h-0 flex-1 overflow-y-auto">
+                            <Leaderboard
+                              students={lbStudents}
+                              tests={lbTests}
+                              marks={lbMarks}
+                            />
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="section"
+                          className="flex min-h-0 flex-1 flex-col"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <h3 className="text-base font-semibold truncate">
+                              {section} —{" "}
+                              <span className={activeTheme.text}>
+                                {(() => {
+                                  if (!sectionForDropdown) return "—";
+                                  if (selectedTestId) {
+                                    const t = liveTests.find((x) => x.id === selectedTestId);
+                                    return t ? labelForDate(t.test_date) : "—";
+                                  }
+                                  return "—";
+                                })()}
+                              </span>
+                            </h3>
+                            <span className={`text-[11px] ${activeTheme.text} shrink-0`}>
+                              Absent shows in red
+                            </span>
+                          </div>
+
+                          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                            <SectionGrid
+                              section={(sectionForDropdown || "MAT") as SectionKey}
+                              students={currentSectionRows}
+                              fixedBodyHeightClass="h-full"
+                              maxScore={maxScoreForGrid}
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+
+                  {/* RIGHT: Notice Board */}
+                  <motion.div
+                    key={`right-${section}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, ease: "easeOut", delay: 0.05 }}
+                    className={CARD_CLASS}
+                    style={{ minHeight: "220px" }}
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <h3 className="text-base font-semibold truncate">Notice Board</h3>
+                      <span className={`text-[11px] ${activeTheme.text} shrink-0`}>
+                        Auto-scrolling
+                      </span>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                      <NoticeCarousel items={liveNotices} barClassName={activeTheme.bar} />
+                    </div>
+                  </motion.div>
+                </div>
+              </>
             )}
-
-            <div className="mt-3 flex items-stretch gap-5">
-              {/* LEFT: Section / Overall */}
-              <motion.div
-                key={`left-${section}-${dateOpt}-${month}`}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
-                className={`w-full md:w-1/2 rounded-2xl border bg-white p-3 ${activeTheme.border} ${CARD_H} flex flex-col`}
-              >
-                <AnimatePresence mode="wait">
-                  {section === "OVERALL" ? (
-                    <motion.div
-                      key="overall"
-                      className="flex min-h-0 flex-1 flex-col"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="mb-2 flex items-center justify-between">
-                        <h3 className="text-base font-semibold">
-                          Overall Leaderboard — {month}
-                        </h3>
-                        <span className="text-[11px] text-zinc-500">
-                          Sums scores across all published tests
-                        </span>
-                      </div>
-                      <div className="h-[180px] overflow-y-auto">
-                        <Leaderboard
-                          students={lbStudents}
-                          tests={lbTests}
-                          marks={lbMarks}
-                        />
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="section"
-                      className="flex min-h-0 flex-1 flex-col"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="mb-2 flex items-center justify-between">
-                        <h3 className="text-base font-semibold">
-                          {section} — {sectionHeaderDateLabel}
-                        </h3>
-                        <span className={`text-[11px] ${activeTheme.text}`}>
-                          Absent shows in red
-                        </span>
-                      </div>
-
-                      <div className={gridBodyClass}>
-                        <SectionGrid
-                          section={(sectionForDropdown || "MAT") as SectionKey}
-                          students={currentSectionRows}
-                          fixedBodyHeightClass="h-full"
-                          maxScore={maxScoreForGrid} // obtained / full
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-
-              {/* RIGHT: Notice Board */}
-              <motion.div
-                key={`right-${section}`}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, ease: "easeOut", delay: 0.05 }}
-                className={`w-full md:w-1/2 rounded-2xl border bg-white p-3 ${activeTheme.border} ${CARD_H} flex flex-col`}
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-base font-semibold">Notice Board</h3>
-                  <span className={`text-[11px] ${activeTheme.text}`}>
-                    Auto-scrolling
-                  </span>
-                </div>
-                <div className="min-h-0 flex-1">
-                  <NoticeCarousel items={liveNotices} barClassName={activeTheme.bar} />
-                </div>
-              </motion.div>
-            </div>
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
       <AdminDrawer

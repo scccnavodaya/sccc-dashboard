@@ -8,24 +8,18 @@ type BaseStudent = {
   id: string;
   name: string;
   photo?: string | null;
-
-  // Per-subject (any that exist will be used)
   mat?: number | null;
   eng?: number | null;
   maths?: number | null;
 };
 
-/** If provided, renders "obtained / total".
- *  - number           → same full mark for everyone (single-test view)
- *  - (s) => number    → per-student full (overall / multi-test aggregates)
- */
 type MaxScore = number | ((s: BaseStudent) => number);
 
 type SectionProps = {
-  mode?: "section";              // default
-  section: SectionKey;           // required in section mode
+  mode?: "section";
+  section: SectionKey;
   students: BaseStudent[];
-  fixedBodyHeightClass?: string; // e.g. "h-[136px]" ~ very compact (~4 rows)
+  fixedBodyHeightClass?: string;
   maxScore?: MaxScore;
 };
 
@@ -69,14 +63,14 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
         <img
           src={src}
           alt={name}
-          className="h-6 w-6 cursor-zoom-in rounded-full border border-zinc-200 object-cover"
+          className="h-7 w-7 sm:h-6 sm:w-6 cursor-zoom-in rounded-full border border-zinc-200 object-cover shrink-0"
           onClick={() => setOpen(true)}
         />
       ) : (
         <button
           onClick={() => setOpen(true)}
           title={name}
-          className="grid h-6 w-6 place-items-center rounded-full bg-zinc-200 text-[9px] font-semibold text-zinc-700"
+          className="grid h-7 w-7 sm:h-6 sm:w-6 place-items-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700 shrink-0"
         >
           {initials}
         </button>
@@ -84,10 +78,13 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
 
       {open && (
         <div
-          className="fixed inset-0 z-[70] bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] bg-black/70 p-4 backdrop-blur-sm
+                     pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
+                     pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"
+          aria-label={`${name} photo preview`}
         >
           <div
             className="mx-auto mt-16 w-full max-w-xs"
@@ -105,7 +102,7 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
             </div>
             <div className="mt-3 text-center text-sm text-white/95">{name}</div>
             <button
-              className="mx-auto mt-3 block rounded-md bg-white/90 px-4 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
+              className="mx-auto mt-3 block h-10 rounded-md bg-white/90 px-4 text-sm font-medium text-zinc-900 hover:bg-white"
               onClick={() => setOpen(false)}
             >
               Close
@@ -118,11 +115,12 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
 }
 
 export default function SectionGrid(props: Props) {
-  // ultra-compact default body height (≈ 3.5–4 rows)
-  const fixedBodyHeightClass = props.fixedBodyHeightClass ?? "h-[136px]";
+  // Keep your height option but give a sensible mobile default window.
+  const fixedBodyHeightClass =
+    props.fixedBodyHeightClass ?? "h-[136px] sm:h-[160px] md:h-[180px]";
+
   const students = props.students;
 
-  // Build rows
   const { rowsPresent, rowsAbsent, mode } = useMemo(() => {
     if (props.mode === "overall") {
       const present = students.map((s) => ({
@@ -133,13 +131,12 @@ export default function SectionGrid(props: Props) {
           (Number(s.mat ?? 0) || 0) +
           (Number(s.eng ?? 0) || 0) +
           (Number(s.maths ?? 0) || 0),
-        src: s as BaseStudent, // keep original for maxScore fn
+        src: s as BaseStudent,
       }));
       present.sort((a, b) => b.score - a.score);
       return { rowsPresent: present, rowsAbsent: [] as any[], mode: "overall" as const };
     }
 
-    // section mode
     const field: keyof BaseStudent =
       props.section === "MAT" ? "mat" : props.section === "ENGLISH" ? "eng" : "maths";
 
@@ -151,20 +148,13 @@ export default function SectionGrid(props: Props) {
       if (v == null) {
         absent.push({ id: s.id, name: s.name, photo: s.photo ?? null, src: s });
       } else {
-        present.push({
-          id: s.id,
-          name: s.name,
-          photo: s.photo ?? null,
-          score: v,
-          src: s,
-        });
+        present.push({ id: s.id, name: s.name, photo: s.photo ?? null, score: v, src: s });
       }
     }
     present.sort((a, b) => b.score - a.score);
     return { rowsPresent: present, rowsAbsent: absent, mode: "section" as const };
   }, [props.mode, (props as any).section, students]);
 
-  // obtained / full helper
   function renderScore(obtained: number, student: BaseStudent) {
     const max = (props as any).maxScore as MaxScore | undefined;
     if (max == null) return fmt(obtained);
@@ -173,18 +163,27 @@ export default function SectionGrid(props: Props) {
     return `${fmt(obtained)}/${fmt(full)}`;
   }
 
-  // super-compact typography/spacing
-  const textSize = "text-[12px]";
+  const textSize = "text-[12px] sm:text-xs";
   const headPad = "py-1";
   const rowPad = "py-1.5";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-200">
+    <div
+      className="
+        rounded-2xl border border-zinc-200 card
+        w-full max-w-full
+        table-scroll            /* enable horizontal scroll on very small phones */
+        mobile-rescue           /* guard against side overflow */
+      "
+    >
       <div className={`${fixedBodyHeightClass} overflow-y-auto`}>
-        <table className={`w-full border-collapse ${textSize}`}>
-          <thead className="sticky top-0 bg-zinc-50">
+        <table
+          className={`w-full border-collapse ${textSize} min-w-[520px]`}
+          aria-label="Section scores"
+        >
+          <thead className="sticky top-0 bg-zinc-50 sticky-top">
             <tr className="text-zinc-600">
-              <th className={`px-3 ${headPad} text-left`}>Rank</th>
+              <th className={`px-3 ${headPad} text-left no-shrink`}>Rank</th>
               <th className={`px-3 ${headPad} text-left`}>Student</th>
               <th className={`px-3 ${headPad} text-right`}>Score</th>
               <th className={`px-3 ${headPad} text-right`}>Status</th>
@@ -196,14 +195,14 @@ export default function SectionGrid(props: Props) {
                 key={`p-${r.id}`}
                 className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
               >
-                <td className={`px-3 ${rowPad}`}>{i + 1}</td>
+                <td className={`px-3 ${rowPad} align-middle no-shrink`}>{i + 1}</td>
                 <td className={`px-3 ${rowPad}`}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <AvatarPreview src={r.photo ?? undefined} name={r.name} />
-                    <span className="truncate font-medium">{r.name}</span>
+                    <span className="truncate font-medium break-anywhere">{r.name}</span>
                   </div>
                 </td>
-                <td className={`px-3 ${rowPad} text-right font-semibold`}>
+                <td className={`px-3 ${rowPad} text-right font-semibold tabular-nums`}>
                   {renderScore(r.score, r.src)}
                 </td>
                 <td className={`px-3 ${rowPad} text-right`}>
@@ -224,11 +223,11 @@ export default function SectionGrid(props: Props) {
                   key={`a-${r.id}`}
                   className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
                 >
-                  <td className={`px-3 ${rowPad}`}>—</td>
+                  <td className={`px-3 ${rowPad} no-shrink`}>—</td>
                   <td className={`px-3 ${rowPad}`}>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <AvatarPreview src={r.photo ?? undefined} name={r.name} />
-                      <span className="truncate font-medium">{r.name}</span>
+                      <span className="truncate font-medium break-anywhere">{r.name}</span>
                     </div>
                   </td>
                   <td className={`px-3 ${rowPad} text-right text-zinc-400`}>—</td>

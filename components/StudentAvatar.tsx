@@ -21,24 +21,36 @@ export default function StudentAvatar({
     .toUpperCase();
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
+    <div
+      className="relative inline-flex shrink-0"
+      style={{ width: size, height: size }}
+    >
       {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt={`Photo of ${name}`}
           className="h-full w-full rounded-full object-cover"
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700">
+        <div
+          className="
+            flex h-full w-full items-center justify-center
+            rounded-full bg-zinc-200
+            text-[10px] sm:text-xs md:text-sm
+            font-semibold text-zinc-700
+          "
+        >
           {initials}
         </div>
       )}
+
       {topper && (
         <motion.span
           className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-amber-500"
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
         />
       )}
     </div>

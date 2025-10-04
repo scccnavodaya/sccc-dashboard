@@ -50,7 +50,15 @@ export default function AdminDrawer({
   if (typeof window === "undefined" || !open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
+    <div
+      className="
+        fixed inset-0 z-[100] 
+        min-h-[100svh]    /* dynamic viewport for mobile */
+      "
+      role="dialog"
+      aria-modal="true"
+      aria-label="Admin drawer"
+    >
       {/* Backdrop */}
       <button
         aria-label="Close"
@@ -61,8 +69,16 @@ export default function AdminDrawer({
       {/* Drawer panel — FROM THE LEFT */}
       <div
         className="
-          absolute left-0 top-0 h-full w-full max-w-md bg-white shadow-xl
+          absolute left-0 top-0
+          h-[100svh] w-full max-w-md sm:max-w-md lg:max-w-lg
+          bg-white shadow-xl
           transform transition-transform duration-300 will-change-transform
+          pt-[env(safe-area-inset-top)]
+          pb-[env(safe-area-inset-bottom)]
+          pl-[env(safe-area-inset-left)]
+          pr-[env(safe-area-inset-right)]
+          overflow-hidden
+          border-r
         "
         style={{ translate: "0" }}
       >
@@ -78,8 +94,8 @@ export default function AdminDrawer({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-4">
+        {/* Body (scrolls independently; prevents layout shift on small screens) */}
+        <div className="p-4 overflow-y-auto h-[calc(100svh-56px)] sm:h-[calc(100svh-56px)]">
           {tab === "login" ? (
             <LoginForm
               onSuccess={onClose}

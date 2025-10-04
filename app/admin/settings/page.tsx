@@ -102,7 +102,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-2 md:px-0">
+    <div className="mx-auto w-full max-w-xl px-3 sm:px-4 py-4">
       {/* Back to Dashboard */}
       <div className="mb-3">
         <Link
@@ -113,7 +113,7 @@ export default function SettingsPage() {
         </Link>
       </div>
 
-      <h2 className="text-lg font-semibold">Change credentials</h2>
+      <h2 className="text-lg sm:text-xl font-semibold">Change credentials</h2>
       <p className="mt-1 text-sm text-zinc-500">
         Update your admin username and/or password.{" "}
         <b>Current password</b> is always required. Passwords must follow the
@@ -127,7 +127,7 @@ export default function SettingsPage() {
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-300"
+            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
             placeholder={
               currentUsername
                 ? `Current: ${currentUsername}`
@@ -145,7 +145,7 @@ export default function SettingsPage() {
               type={showCurrent ? "text" : "password"}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-300"
+              className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
               placeholder="Enter current password"
               autoComplete="current-password"
               required
@@ -169,7 +169,7 @@ export default function SettingsPage() {
               type={showNew ? "text" : "password"}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-300"
+              className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
               placeholder="Enter new password"
               autoComplete="new-password"
               pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,64}"
@@ -208,11 +208,9 @@ export default function SettingsPage() {
           )}
 
           {/* Rules helper */}
-          <ul className="mt-2 list-disc pl-5 text-xs text-zinc-500">
+          <ul className="mt-2 list-disc pl-5 text-xs text-zinc-500 space-y-0.5">
             <li>8–64 characters</li>
-            <li>
-              At least 1 uppercase, 1 lowercase, 1 number, 1 special character
-            </li>
+            <li>At least 1 uppercase, 1 lowercase, 1 number, 1 special character</li>
           </ul>
 
           {/* Confirm (only when changing password) */}
@@ -226,7 +224,7 @@ export default function SettingsPage() {
                   type={showConfirm ? "text" : "password"}
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-300"
+                  className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
                   placeholder="Re-enter new password"
                   autoComplete="new-password"
                   required
@@ -244,14 +242,22 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {err && <p className="text-sm text-red-600">{err}</p>}
-        {msg && <p className="text-sm text-emerald-700">{msg}</p>}
+        {err && (
+          <p className="text-sm text-red-600" aria-live="polite">
+            {err}
+          </p>
+        )}
+        {msg && (
+          <p className="text-sm text-emerald-700" aria-live="polite">
+            {msg}
+          </p>
+        )}
 
         <div className="pt-2">
           <button
             type="submit"
             disabled={loading || !canSubmit}
-            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+            className="h-10 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
           >
             {loading ? "Saving..." : "Save changes"}
           </button>

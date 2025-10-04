@@ -1,3 +1,4 @@
+// app/admin/tests/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -29,7 +30,7 @@ type Row = {
   student_id: string;
   name: string;
   present: boolean;
-  wrongStr: string; // keep as string so user can clear it
+  wrongStr: string;
 };
 
 type RecentTest = {
@@ -70,13 +71,11 @@ function ymFromISO(isoDate: string) {
 }
 
 export default function AdminTestsPage() {
-  // ── form state ────────────────────────────────────────────────
   const [section, setSection] = useState<SectionKey>("MAT");
   const [testDate, setTestDate] = useState<string>(() =>
     new Date().toISOString().slice(0, 10)
   );
 
-  // questions as string (allows empty)
   const [totalQStr, setTotalQStr] = useState<string>("0");
   const totalQ = useMemo(
     () => Math.max(0, parseInt((totalQStr || "0").trim(), 10) || 0),
@@ -87,16 +86,13 @@ export default function AdminTestsPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // banners (inline, no alert/localhost text)
   const [banner, setBanner] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
-  // ── right panel: recent ───────────────────────────────────────
   const [recent, setRecent] = useState<RecentTest[]>([]);
   const [recentFilter, setRecentFilter] = useState<SectionKey | "ALL">("ALL");
-  const [recentMonth, setRecentMonth] = useState<string>(() => ymNowIST()); // YYYY-MM
+  const [recentMonth, setRecentMonth] = useState<string>(() => ymNowIST());
   const [loadingRecent, setLoadingRecent] = useState(true);
 
-  // edit/delete
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<RecentTest | null>(null);
   const [editDraft, setEditDraft] = useState<{ section: SectionKey; date: string; totalQStr: string; }>({
@@ -105,11 +101,9 @@ export default function AdminTestsPage() {
     totalQStr: "0",
   });
 
-  // derived
   const presentCount = useMemo(() => rows.filter((r) => r.present).length, [rows]);
   const maxMarks = useMemo(() => totalQ * 1.25, [totalQ]);
 
-  // ── helpers ───────────────────────────────────────────────────
   function parseAndClampWrong(str: string): number {
     const n = parseInt((str || "").trim(), 10);
     const raw = Number.isFinite(n) ? n : 0;
@@ -124,7 +118,7 @@ export default function AdminTestsPage() {
   }
 
   function setWrongStr(id: string, v: string) {
-    const cleaned = v.replace(/[^\d]/g, ""); // digits only, allow empty
+    const cleaned = v.replace(/[^\d]/g, "");
     setRows((list) => list.map((r) => (r.student_id === id ? { ...r, wrongStr: cleaned } : r)));
   }
 
@@ -135,12 +129,9 @@ export default function AdminTestsPage() {
   async function revalidatePublic() {
     try {
       await fetch("/api/revalidate", { method: "POST" });
-    } catch {
-      /* non-blocking */
-    }
+    } catch {}
   }
 
-  // ── loaders ───────────────────────────────────────────────────
   async function loadStudents() {
     try {
       const r = await fetch("/api/admin/students", { credentials: "include" });
@@ -166,7 +157,7 @@ export default function AdminTestsPage() {
     try {
       const params = new URLSearchParams();
       if (recentFilter !== "ALL") params.set("section", recentFilter);
-      if (recentMonth) params.set("month", recentMonth); // YYYY-MM
+      if (recentMonth) params.set("month", recentMonth);
       const r = await fetch(`/api/admin/tests${params.toString() ? `?${params.toString()}` : ""}`, {
         credentials: "include",
       });
@@ -188,7 +179,6 @@ export default function AdminTestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentFilter, recentMonth]);
 
-  // ── submit/save ────────────────────────────────────────────────
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBanner(null);
@@ -207,12 +197,12 @@ export default function AdminTestsPage() {
       const payload = {
         section,
         test_date: testDate,
-        total_questions: totalQ, // server mirrors to legacy 'questions' too
+        total_questions: totalQ,
         marks: rows
           .filter((r) => r.present)
           .map((r) => ({
             student_id: r.student_id,
-            wrong: parseAndClampWrong(r.wrongStr), // 0 allowed (full score)
+            wrong: parseAndClampWrong(r.wrongStr),
           })),
       };
 
@@ -225,10 +215,8 @@ export default function AdminTestsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed to save test");
 
-      // Reset wrong counts, keep present flags
       setRows((list) => list.map((r) => ({ ...r, wrongStr: "0" })));
 
-      // Jump the Recent pane to this section+month
       setRecentFilter(section);
       setRecentMonth(ymFromISO(testDate));
 
@@ -243,7 +231,6 @@ export default function AdminTestsPage() {
     }
   }
 
-  // ── recent actions ─────────────────────────────────────────────
   function openEdit(t: RecentTest) {
     setEditing(t);
     setEditDraft({
@@ -277,7 +264,6 @@ export default function AdminTestsPage() {
       if (!r.ok) throw new Error(data?.error || "Update failed");
 
       setEditing(null);
-      // keep Recent on edited section + month
       setRecentFilter(editDraft.section);
       setRecentMonth(ymFromISO(editDraft.date));
 
@@ -293,7 +279,6 @@ export default function AdminTestsPage() {
   async function doDelete(id: string) {
     setBanner(null);
     try {
-      // optional: cascade marks first if DB doesn’t cascade
       await fetch(`/api/admin/marks/by-test/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
       const r = await fetch(`/api/admin/tests/${id}`, {
         method: "DELETE",
@@ -312,30 +297,30 @@ export default function AdminTestsPage() {
     }
   }
 
-  // ── UI constants: same-size scroll windows (≈4 rows) ───────────
-  const fixedScrollCls = "h-[224px] overflow-y-auto"; // ~56px/row, both panes equal
+  // Responsive heights: generous on mobile, fixed on desktop
+  const fixedScrollCls =
+    "max-h-[60vh] md:h-[224px] overflow-y-auto";
 
-  // row fade/slide
   const rowVariants = {
     hidden: { opacity: 0, y: 4 },
     show: { opacity: 1, y: 0, transition: { duration: 0.18 } },
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-2 md:py-4">
+    <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-2 md:py-4 safe-x">
       {/* Top bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Link
             href="/admin"
-            className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
+            className="inline-flex items-center gap-1 rounded border px-2.5 py-1.5 sm:px-3 text-xs sm:text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
           >
-            <ArrowLeft size={16} /> Back to Dashboard
+            <ArrowLeft size={14} className="sm:h-4 sm:w-4" /> Back to Dashboard
           </Link>
-          <h2 className="text-xl font-semibold">Tests</h2>
+          <h2 className="text-lg sm:text-xl font-semibold">Tests</h2>
         </div>
-        <div className="flex items-center gap-2 text-sm text-zinc-600">
-          <ClipboardList size={16} />
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-zinc-600">
+          <ClipboardList size={14} className="sm:h-4 sm:w-4" />
           <span>{presentCount} present</span>
         </div>
       </div>
@@ -348,35 +333,37 @@ export default function AdminTestsPage() {
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className={`mb-3 rounded-md px-3 py-2 text-sm shadow-sm ${
+            className={`mb-3 rounded-md px-3 py-2 text-xs sm:text-sm shadow-sm ${
               banner.type === "success"
                 ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border border-red-200 bg-red-50 text-red-700"
             }`}
+            aria-live="polite"
           >
             {banner.msg}
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:gap-4 md:grid-cols-2">
         {/* LEFT: form */}
         <motion.form
           onSubmit={submit}
-          className="rounded-2xl border bg-white p-4 shadow-sm"
+          className="rounded-2xl border bg-white p-3 sm:p-4 shadow-sm"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
           {/* inputs */}
-          <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="mb-3 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-3">
             {/* Section */}
             <div>
-              <label className="text-xs text-zinc-600">Section</label>
+              <label className="text-[11px] sm:text-xs text-zinc-600">Section</label>
               <select
                 value={section}
                 onChange={(e) => setSection(e.target.value as SectionKey)}
-                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 transition focus:ring-2 focus:ring-emerald-300"
+                className="mt-1 w-full rounded border border-zinc-300 px-2.5 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                aria-label="Test section"
               >
                 <option value="MAT">MAT</option>
                 <option value="ENGLISH">ENGLISH</option>
@@ -385,20 +372,21 @@ export default function AdminTestsPage() {
             </div>
             {/* Date */}
             <div>
-              <label className="text-xs text-zinc-600">Test Date</label>
+              <label className="text-[11px] sm:text-xs text-zinc-600">Test Date</label>
               <div className="relative mt-1">
                 <input
                   type="date"
                   value={testDate}
                   onChange={(e) => setTestDate(e.target.value)}
-                  className="w-full rounded border border-zinc-300 px-3 py-2 pr-8 transition focus:ring-2 focus:ring-emerald-300"
+                  className="w-full rounded border border-zinc-300 px-2.5 py-2 pr-8 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                  aria-label="Test date"
                 />
                 <Calendar className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-zinc-400" />
               </div>
             </div>
             {/* Total Questions */}
             <div>
-              <label className="text-xs text-zinc-600">Total Questions</label>
+              <label className="text-[11px] sm:text-xs text-zinc-600">Total Questions</label>
               <input
                 inputMode="numeric"
                 value={totalQStr}
@@ -406,27 +394,30 @@ export default function AdminTestsPage() {
                 onFocus={() => {
                   if (totalQStr === "0") setTotalQStr("");
                 }}
-                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 transition focus:ring-2 focus:ring-emerald-300"
+                className="mt-1 w-full rounded border border-zinc-300 px-2.5 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
                 placeholder="0"
+                aria-label="Total questions"
               />
             </div>
           </div>
 
           {/* header actions */}
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-medium">Enter wrong counts (each Q = 1.25)</div>
-            <div className="flex items-center gap-2 text-sm">
+          <div className="mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="text-xs sm:text-sm font-medium">
+              Enter wrong counts (each Q = 1.25)
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
               <button
                 type="button"
                 onClick={() => markAllPresent(true)}
-                className="rounded border px-2 py-1 transition hover:bg-zinc-50 active:scale-[0.99]"
+                className="rounded border px-2.5 py-1 transition hover:bg-zinc-50 active:scale-[0.99]"
               >
                 Mark all present
               </button>
               <button
                 type="button"
                 onClick={() => markAllPresent(false)}
-                className="rounded border px-2 py-1 transition hover:bg-zinc-50 active:scale-[0.99]"
+                className="rounded border px-2.5 py-1 transition hover:bg-zinc-50 active:scale-[0.99]"
               >
                 Mark all absent
               </button>
@@ -434,15 +425,15 @@ export default function AdminTestsPage() {
           </div>
 
           {/* Students grid */}
-          <div className={`${fixedScrollCls} rounded border`}>
-            <table className="w-full text-sm">
+          <div className={`${fixedScrollCls} rounded border overflow-x-auto`}>
+            <table className="w-full min-w-[560px] sm:min-w-0 text-xs sm:text-sm">
               <thead className="sticky top-0 bg-zinc-50">
                 <tr className="text-left text-zinc-600">
-                  <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">Student</th>
-                  <th className="px-3 py-2">Present</th>
-                  <th className="px-3 py-2">Wrong</th>
-                  <th className="px-3 py-2 text-right">Score</th>
+                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">#</th>
+                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Student</th>
+                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Present</th>
+                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Wrong</th>
+                  <th className="px-2.5 sm:px-3 py-2 text-right whitespace-nowrap">Score</th>
                 </tr>
               </thead>
               <tbody>
@@ -460,37 +451,41 @@ export default function AdminTestsPage() {
                         exit={{ opacity: 0 }}
                         className="border-t transition-colors hover:bg-zinc-50"
                       >
-                        <td className="px-3 py-2">{i + 1}</td>
-                        <td className="px-3 py-2">
+                        <td className="px-2.5 sm:px-3 py-2">{i + 1}</td>
+                        <td className="px-2.5 sm:px-3 py-2">
                           <div className="flex items-center gap-2">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={buildPhotoUrl(stu)}
                               alt={r.name}
-                              className="h-8 w-8 rounded-full border object-cover"
+                              className="h-7 w-7 sm:h-8 sm:w-8 rounded-full border object-cover"
                             />
-                            <span className="font-medium">{r.name}</span>
+                            <span className="font-medium truncate max-w-[160px] sm:max-w-none">
+                              {r.name}
+                            </span>
                           </div>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2.5 sm:px-3 py-2">
                           <input
                             type="checkbox"
                             checked={r.present}
                             onChange={() => togglePresent(r.student_id)}
+                            aria-label={`Present: ${r.name}`}
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2.5 sm:px-3 py-2">
                           <input
                             type="text"
                             inputMode="numeric"
                             disabled={!r.present}
                             value={r.wrongStr}
                             onChange={(e) => setWrongStr(r.student_id, e.target.value)}
-                            className="w-20 rounded border border-zinc-300 px-2 py-1 transition focus:ring-2 focus:ring-emerald-300 disabled:bg-zinc-50"
+                            className="w-16 sm:w-20 rounded border border-zinc-300 px-2 py-1 transition focus:ring-2 focus:ring-emerald-300 disabled:bg-zinc-50"
                             placeholder="0"
+                            aria-label={`Wrong answers: ${r.name}`}
                           />
                         </td>
-                        <td className="px-3 py-2 text-right font-semibold">
+                        <td className="px-2.5 sm:px-3 py-2 text-right font-semibold">
                           {r.present ? `${fmt(score)}/${fmt(maxMarks)}` : "—"}
                         </td>
                       </motion.tr>
@@ -509,46 +504,46 @@ export default function AdminTestsPage() {
           </div>
 
           {/* footer */}
-          <div className="mt-3 flex items-center justify-between">
+          <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
             <button
               type="button"
               onClick={loadStudents}
-              className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
+              className="inline-flex items-center gap-1 rounded border px-2.5 py-1.5 text-xs sm:text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
             >
-              <RotateCcw size={16} /> Refresh students
+              <RotateCcw size={14} className="sm:h-4 sm:w-4" /> Refresh students
             </button>
             <button
               type="submit"
               disabled={saving || !testDate || totalQ === 0}
-              className="inline-flex items-center gap-2 rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded bg-emerald-600 px-3 sm:px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60"
             >
-              <CheckCircle2 size={16} />
+              <CheckCircle2 size={16} className="sm:h-4 sm:w-4" />
               {saving ? "Saving…" : "Save Test"}
             </button>
           </div>
         </motion.form>
 
-        {/* RIGHT: recent tests (fixed height + scroll to match left) */}
+        {/* RIGHT: recent tests */}
         <motion.div
-          className="rounded-2xl border bg-white p-4 shadow-sm"
+          className="rounded-2xl border bg-white p-3 sm:p-4 shadow-sm"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: 0.05 }}
         >
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-base font-medium">Recent Tests</div>
-            <div className="flex items-center gap-2">
+          <div className="mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="text-sm sm:text-base font-medium">Recent Tests</div>
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="month"
                 value={recentMonth}
                 onChange={(e) => setRecentMonth(e.target.value)}
-                className="rounded border border-zinc-300 px-2 py-1 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                className="rounded border border-zinc-300 px-2 py-1 text-xs sm:text-sm transition focus:ring-2 focus:ring-emerald-300"
                 aria-label="Filter by month"
               />
               <select
                 value={recentFilter}
                 onChange={(e) => setRecentFilter(e.target.value as SectionKey | "ALL")}
-                className="rounded border border-zinc-300 px-2 py-1 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                className="rounded border border-zinc-300 px-2 py-1 text-xs sm:text-sm transition focus:ring-2 focus:ring-emerald-300"
                 aria-label="Filter by section"
               >
                 <option value="ALL">All sections</option>
@@ -559,15 +554,15 @@ export default function AdminTestsPage() {
             </div>
           </div>
 
-          <div className={`${fixedScrollCls} rounded border`}>
-            <table className="w-full text-sm">
+          <div className={`${fixedScrollCls} rounded border overflow-x-auto`}>
+            <table className="w-full min-w-[520px] sm:min-w-0 text-xs sm:text-sm">
               <thead className="sticky top-0 bg-zinc-50">
                 <tr className="text-left text-zinc-600">
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Section</th>
-                  <th className="px-3 py-2">Total Q</th>
-                  <th className="px-3 py-2 text-right">Entries</th>
-                  <th className="px-3 py-2 text-right">Actions</th>
+                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Date</th>
+                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Section</th>
+                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Total Q</th>
+                  <th className="px-2.5 sm:px-3 py-2 text-right whitespace-nowrap">Entries</th>
+                  <th className="px-2.5 sm:px-3 py-2 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -600,41 +595,41 @@ export default function AdminTestsPage() {
                 ) : (
                   recent.map((t) => (
                     <tr key={t.id} className="border-t transition-colors hover:bg-zinc-50">
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 whitespace-nowrap">
                         {new Date(t.test_date + "T00:00:00").toLocaleDateString("en-IN")}
                       </td>
-                      <td className="px-3 py-2">{t.section}</td>
-                      <td className="px-3 py-2">{t.total_questions ?? 0}</td>
-                      <td className="px-3 py-2 text-right">{t.marks_count}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{t.section}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{t.total_questions ?? 0}</td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">{t.marks_count}</td>
                       <td className="px-3 py-2 text-right">
                         {confirmDeleteId === t.id ? (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <button
                               onClick={() => setConfirmDeleteId(null)}
-                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition hover:bg-zinc-50 active:scale-[0.98]"
+                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] sm:text-xs transition hover:bg-zinc-50 active:scale-[0.99]"
                             >
-                              <X size={14} /> No
+                              <X size={12} className="sm:h-3.5 sm:w-3.5" /> No
                             </button>
                             <button
                               onClick={() => doDelete(t.id)}
-                              className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700 transition hover:bg-red-100 active:scale-[0.98]"
+                              className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-[11px] sm:text-xs text-red-700 transition hover:bg-red-100 active:scale-[0.99]"
                             >
-                              <Trash2 size={14} /> Yes, delete
+                              <Trash2 size={12} className="sm:h-3.5 sm:w-3.5" /> Yes, delete
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <button
                               onClick={() => openEdit(t)}
-                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition hover:bg-zinc-50 active:scale-[0.98]"
+                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] sm:text-xs transition hover:bg-zinc-50 active:scale-[0.99]"
                             >
-                              <Pencil size={14} /> Edit
+                              <Pencil size={12} className="sm:h-3.5 sm:w-3.5" /> Edit
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(t.id)}
-                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs text-red-600 transition hover:bg-red-50 active:scale-[0.98]"
+                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] sm:text-xs text-red-600 transition hover:bg-red-50 active:scale-[0.99]"
                             >
-                              <Trash2 size={14} /> Delete
+                              <Trash2 size={12} className="sm:h-3.5 sm:w-3.5" /> Delete
                             </button>
                           </div>
                         )}
@@ -663,6 +658,7 @@ export default function AdminTestsPage() {
                       setEditDraft((d) => ({ ...d, section: e.target.value as SectionKey }))
                     }
                     className="rounded border border-zinc-300 px-3 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                    aria-label="Edit section"
                   >
                     <option value="MAT">MAT</option>
                     <option value="ENGLISH">ENGLISH</option>
@@ -673,6 +669,7 @@ export default function AdminTestsPage() {
                     value={editDraft.date}
                     onChange={(e) => setEditDraft((d) => ({ ...d, date: e.target.value }))}
                     className="rounded border border-zinc-300 px-3 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                    aria-label="Edit test date"
                   />
                   <input
                     inputMode="numeric"
@@ -685,6 +682,7 @@ export default function AdminTestsPage() {
                     }
                     className="rounded border border-zinc-300 px-3 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
                     placeholder="0"
+                    aria-label="Edit total questions"
                   />
                 </div>
                 <div className="mt-2 flex items-center justify-end gap-2">

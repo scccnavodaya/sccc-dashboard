@@ -1,3 +1,4 @@
+// app/admin/feedback/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -46,11 +47,16 @@ function ConfirmDialog({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[140] bg-black/50 p-4"
+        className="fixed inset-0 z-[140] bg-black/50 p-4
+                   pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
+                   pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onCancel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
       >
         <motion.div
           className="mx-auto mt-24 w-full max-w-md rounded-2xl bg-white p-4 shadow-xl"
@@ -65,14 +71,14 @@ function ConfirmDialog({
             <button
               onClick={onCancel}
               disabled={busy}
-              className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-60"
+              className="h-10 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
               disabled={busy}
-              className={`rounded px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60 ${
+              className={`h-10 rounded px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-60 ${
                 danger ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"
               }`}
             >
@@ -203,21 +209,21 @@ export default function AdminFeedbackPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4">
+    <div className="safe-x mx-auto w-full max-w-5xl px-3 sm:px-4 lg:px-6 py-4">
       {/* Top bar with Back to Dashboard */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
+            className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
           >
             ← Back to Dashboard
           </Link>
-          <h2 className="text-xl font-semibold">Parent Feedback</h2>
+          <h2 className="text-lg sm:text-xl font-semibold truncate">Parent Feedback</h2>
         </div>
         <button
           onClick={load}
-          className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
+          className="h-10 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
         >
           Refresh
         </button>
@@ -236,6 +242,7 @@ export default function AdminFeedbackPage() {
                 ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border border-red-200 bg-red-50 text-red-700"
             }`}
+            aria-live="polite"
           >
             {banner.msg}
           </motion.div>
@@ -249,16 +256,17 @@ export default function AdminFeedbackPage() {
       )}
 
       {/* Top: Older feedback dropdown */}
-      <div className="mb-3 flex items-center gap-2">
-        <label className="text-sm text-zinc-600">Older feedback:</label>
+      <div className="mb-3 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        <label className="text-sm text-zinc-600 shrink-0">Older feedback:</label>
         <select
-          className="min-w-[260px] rounded border border-zinc-300 px-2 py-1 text-sm"
+          className="w-full sm:w-auto min-w-[240px] sm:min-w-[260px] rounded border border-zinc-300 bg-white px-2 py-2 text-sm"
           onChange={(e) => {
             const id = e.target.value;
             const item = items.find((x) => x.id === id) || null;
             if (item) setOpenItem(item);
             e.currentTarget.selectedIndex = 0;
           }}
+          aria-label="Select older feedback to view"
         >
           <option value="">Select to view…</option>
           {older.map((f) => (
@@ -270,12 +278,12 @@ export default function AdminFeedbackPage() {
       </div>
 
       {/* Latest 5 list (single-line rows) */}
-      <div className="rounded-2xl border bg-white">
+      <div className="rounded-2xl border bg-white overflow-hidden">
         <div className="sticky top-0 z-10 border-b bg-zinc-50/70 px-3 py-2 text-sm text-zinc-600 backdrop-blur">
           Latest 5 — click a row to view full
         </div>
 
-        <div className="max-h-[360px] overflow-y-auto">
+        <div className="max-h-[60vh] sm:max-h-[360px] overflow-y-auto">
           {loading ? (
             <div className="space-y-2 p-3">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -325,11 +333,16 @@ export default function AdminFeedbackPage() {
       <AnimatePresence>
         {openItem && (
           <motion.div
-            className="fixed inset-0 z-[120] bg-black/50 p-4"
+            className="fixed inset-0 z-[120] bg-black/50 p-4
+                       pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
+                       pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setOpenItem(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Feedback details"
           >
             <motion.div
               className="mx-auto mt-16 w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl"
@@ -339,7 +352,7 @@ export default function AdminFeedbackPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-2 flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <div className="text-base font-semibold">
                     {openItem.student_name}{" "}
                     <span className="font-normal text-zinc-500">({openItem.parent_name})</span>
@@ -349,13 +362,13 @@ export default function AdminFeedbackPage() {
                 <div className="shrink-0 space-x-2">
                   <button
                     onClick={() => setRead(openItem.id, !openItem.read)}
-                    className="rounded border px-2 py-1 text-xs hover:bg-zinc-50"
+                    className="h-9 rounded border px-2 py-1 text-xs hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   >
                     {openItem.read ? "Mark Unread" : "Mark Read"}
                   </button>
                   <button
                     onClick={() => askDelete(openItem)}
-                    className="rounded border px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                    className="h-9 rounded border px-2 py-1 text-xs text-red-600 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   >
                     Delete
                   </button>
@@ -364,7 +377,7 @@ export default function AdminFeedbackPage() {
 
               <div
                 className="rounded-md border bg-zinc-50 p-3 text-sm leading-relaxed text-zinc-800
-                           whitespace-pre-wrap break-words max-h-72 overflow-y-auto overflow-x-hidden"
+                           whitespace-pre-wrap break-words max-h-[50vh] sm:max-h-72 overflow-y-auto overflow-x-hidden"
               >
                 {openItem.comment}
               </div>
@@ -372,7 +385,7 @@ export default function AdminFeedbackPage() {
               <div className="mt-3 flex items-center justify-end">
                 <button
                   onClick={() => setOpenItem(null)}
-                  className="rounded-md px-3 py-1.5 text-sm hover:bg-zinc-100"
+                  className="h-10 rounded-md px-3 py-1.5 text-sm hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                 >
                   Close
                 </button>
@@ -386,7 +399,11 @@ export default function AdminFeedbackPage() {
       <ConfirmDialog
         open={!!toDelete}
         title="Delete this feedback?"
-        message={toDelete ? `This will permanently remove feedback from ${toDelete.parent_name} about ${toDelete.student_name}.` : ""}
+        message={
+          toDelete
+            ? `This will permanently remove feedback from ${toDelete.parent_name} about ${toDelete.student_name}.`
+            : ""
+        }
         danger
         busy={deleting}
         onCancel={() => (deleting ? null : setToDelete(null))}

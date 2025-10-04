@@ -22,8 +22,17 @@ export default function ChipBar({
   ];
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-1 overflow-x-auto">
-      <div className="flex items-center gap-2">
+    <div
+      className="
+        w-full max-w-full min-w-0
+        rounded-2xl border border-zinc-200 bg-white p-1
+        overflow-x-auto
+        [scrollbar-width:thin]
+      "
+      role="tablist"
+      aria-label="Sections"
+    >
+      <div className="flex items-center gap-1.5 sm:gap-2 px-0.5 sm:px-0 w-max min-w-full">
         <LayoutGroup id="section-chips">
           {items.map((it) => {
             const isActive = active === it.key;
@@ -33,15 +42,23 @@ export default function ChipBar({
                 key={it.key}
                 onClick={() => onChange(it.key)}
                 whileTap={{ scale: 0.98 }}
-                className={`relative rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  isActive ? theme.text : "text-zinc-500 hover:text-zinc-800"
-                }`}
+                role="tab"
+                aria-selected={isActive}
+                className={`
+                  relative rounded-full
+                  h-10 sm:h-9
+                  px-3.5 sm:px-4
+                  text-[13px] sm:text-sm font-medium
+                  whitespace-nowrap
+                  transition-colors
+                  ${isActive ? theme.text : "text-zinc-500 hover:text-zinc-800"}
+                `}
               >
                 {it.label}
                 {isActive && (
                   <motion.span
                     layoutId="chip-pill-active"
-                    className={`absolute inset-0 -z-10 rounded-full ${theme.pill} shadow-sm`}
+                    className={`pointer-events-none absolute inset-0 -z-10 rounded-full ${theme.pill} shadow-sm`}
                     transition={{ type: "spring", stiffness: 420, damping: 34 }}
                   />
                 )}

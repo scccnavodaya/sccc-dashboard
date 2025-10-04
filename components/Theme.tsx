@@ -7,10 +7,8 @@ export type TabKey = "OVERALL" | "MAT" | "ENGLISH" | "MATHS";
 
 export const colorMap: Record<TabKey, {
   name: string;
-  // page bg gradient (tailwind classes)
   gradientFrom: string;
   gradientTo: string;
-  // UI accents
   pill: string;
   text: string;
   border: string;
@@ -27,7 +25,12 @@ export function GradientBackground({ tab, children }: { tab: TabKey; children: R
   const t = colorMap[tab];
 
   return (
-    <div className="relative">
+    <div
+      className="
+        relative w-full max-w-full min-w-0
+        pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
+      "
+    >
       {/* animated gradient layer */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <AnimatePresence mode="wait">
@@ -36,12 +39,16 @@ export function GradientBackground({ tab, children }: { tab: TabKey; children: R
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            className={`absolute inset-0 bg-gradient-to-b ${t.gradientFrom} ${t.gradientTo}`}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className={`
+              absolute inset-0 bg-gradient-to-b ${t.gradientFrom} ${t.gradientTo}
+              motion-reduce:transition-none motion-reduce:opacity-100
+            `}
           />
         </AnimatePresence>
       </div>
-      {children}
+      {/* content */}
+      <div className="w-full max-w-full min-w-0">{children}</div>
     </div>
   );
 }

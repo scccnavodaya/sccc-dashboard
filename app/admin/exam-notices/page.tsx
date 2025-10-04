@@ -1,5 +1,7 @@
+// app/admin/exam-notices/page.tsx
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -18,11 +20,11 @@ function whenLabel(iso?: string | null) {
   try {
     return new Date(iso).toLocaleString();
   } catch {
-    return iso;
+    return iso ?? "-";
   }
 }
 
-/* ---------- Small confirm dialog (no browser confirm) ---------- */
+/* ---------- Reusable small confirm dialog ---------- */
 function ConfirmDialog({
   open,
   title,
@@ -44,11 +46,16 @@ function ConfirmDialog({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[140] bg-black/50 p-4"
+        className="fixed inset-0 z-[140] bg-black/50 p-4
+                   pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
+                   pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onCancel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
       >
         <motion.div
           className="mx-auto mt-24 w-full max-w-md rounded-2xl bg-white p-4 shadow-xl"
@@ -58,19 +65,19 @@ function ConfirmDialog({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="text-base font-semibold">{title}</div>
-          {message && <p className="mt-1 text-sm text-zinc-600">{message}</p>}
+          {message && <p className="mt-1 text-sm text-zinc-600 break-words">{message}</p>}
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
               onClick={onCancel}
               disabled={busy}
-              className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-60"
+              className="h-10 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
               disabled={busy}
-              className={`rounded px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60 ${
+              className={`h-10 rounded px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60 ${
                 danger ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"
               }`}
             >
@@ -108,6 +115,7 @@ export default function ExamNoticesPage() {
   const [toDelete, setToDelete] = useState<ExamNotice | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // helpers
   async function fetchJSON(url: string, init?: RequestInit) {
     const r = await fetch(url, init);
     const data = await r.json().catch(() => ({}));
@@ -116,7 +124,6 @@ export default function ExamNoticesPage() {
   }
 
   async function revalidatePublic() {
-    // optional: trigger ISR/public cache to update "Latest Exam" on public header
     try {
       await fetch("/api/revalidate", { method: "POST" });
     } catch {
@@ -129,7 +136,6 @@ export default function ExamNoticesPage() {
     setErr(null);
     try {
       const data = (await fetchJSON(BASE)) as ExamNotice[];
-      // newest first
       data.sort((a, b) => new Date(b.start_at).getTime() - new Date(a.start_at).getTime());
       setItems(data);
     } catch (e: any) {
@@ -158,7 +164,6 @@ export default function ExamNoticesPage() {
     setPublishing(true);
     setBanner(null);
     try {
-      // server should mark this as active and deactivate the previous active
       await fetchJSON(BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -179,11 +184,10 @@ export default function ExamNoticesPage() {
   async function setActive(id: string, active: boolean) {
     setBanner(null);
     const prev = items;
-    // optimistic: flip chosen; if activating, also flip previous active to false in UI
-    setItems((list) => {
-      const next = list.map((n) => (n.id === id ? { ...n, active } : active ? { ...n, active: false } : n));
-      return next;
-    });
+    // Optimistic: if setting active true, demote others; if false, just toggle this one.
+    setItems((list) =>
+      list.map((n) => (n.id === id ? { ...n, active } : active ? { ...n, active: false } : n)),
+    );
     try {
       await fetchJSON(`${BASE}/${id}`, {
         method: "PATCH",
@@ -256,26 +260,29 @@ export default function ExamNoticesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4">
+    <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 lg:px-6 py-4">
+      {/* Top bar */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <a
+        <div className="flex items-center gap-2 min-w-0">
+          <Link
             href="/admin"
             className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
           >
             ← Back to Dashboard
-          </a>
-          <h2 className="text-xl font-semibold">Exam Notices (Ticker)</h2>
+          </Link>
+          <h2 className="text-lg sm:text-xl font-semibold truncate">
+            Exam Notices (Ticker)
+          </h2>
         </div>
         <button
           onClick={load}
-          className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
+          className="h-10 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
         >
           Refresh
         </button>
       </div>
 
-      {/* banners */}
+      {/* Inline banner */}
       <AnimatePresence>
         {banner && (
           <motion.div
@@ -288,6 +295,7 @@ export default function ExamNoticesPage() {
                 ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border border-red-200 bg-red-50 text-red-700"
             }`}
+            aria-live="polite"
           >
             {banner.msg}
           </motion.div>
@@ -300,40 +308,43 @@ export default function ExamNoticesPage() {
         </div>
       )}
 
-      {/* publish new */}
-      <form onSubmit={add} className="mb-4 rounded-2xl border bg-white p-3">
+      {/* Publish new */}
+      <form onSubmit={add} className="mb-4 rounded-2xl border bg-white p-3 sm:p-4">
         <label className="text-sm text-zinc-600">New notice (publishes live)</label>
-        <div className="mt-1 flex gap-2">
+        <div className="mt-1 flex flex-col sm:flex-row gap-2">
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Enter exam notice text"
-            className="flex-1 rounded border border-zinc-300 px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-300"
+            className="flex-1 rounded border border-zinc-300 bg-white px-3 h-11 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
+            aria-label="Exam notice text"
           />
           <button
             type="submit"
             disabled={publishing || !text.trim()}
-            className="rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+            className="h-11 rounded bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
           >
             {publishing ? "Publishing…" : "Publish"}
           </button>
         </div>
         <p className="mt-2 text-xs text-zinc-500">
-          Publishing creates the latest <b>active</b> notice and replaces the previous one on the public page (header “Latest Exam” in red).
+          Publishing creates the latest <b>active</b> notice and replaces the previous one on the public page
+          (header “Latest Exam” in red).
         </p>
       </form>
 
-      {/* older dropdown */}
-      <div className="mb-3 flex items-center gap-2">
-        <label className="text-sm text-zinc-600">Older notices:</label>
+      {/* Older dropdown */}
+      <div className="mb-3 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        <label className="text-sm text-zinc-600 shrink-0">Older notices:</label>
         <select
-          className="min-w-[280px] rounded border border-zinc-300 px-2 py-1 text-sm"
+          className="w-full sm:w-auto min-w-[240px] sm:min-w-[280px] rounded border border-zinc-300 bg-white px-2 py-2 text-sm"
           onChange={(e) => {
             const id = e.target.value;
             const n = items.find((x) => x.id === id);
             if (n) openEdit(n);
             e.currentTarget.selectedIndex = 0;
           }}
+          aria-label="Select older notice to view or edit"
         >
           <option value="">Select to view/edit…</option>
           {older.map((n) => (
@@ -344,8 +355,8 @@ export default function ExamNoticesPage() {
         </select>
       </div>
 
-      {/* latest 5 list */}
-      <div className="rounded-2xl border bg-white">
+      {/* Latest 5 list */}
+      <div className="rounded-2xl border bg-white overflow-hidden">
         <div className="sticky top-0 z-10 border-b bg-zinc-50/70 px-3 py-2 text-sm text-zinc-600 backdrop-blur">
           Latest 5 — click a row to edit / manage
         </div>
@@ -390,15 +401,20 @@ export default function ExamNoticesPage() {
         </div>
       </div>
 
-      {/* edit modal */}
+      {/* Edit modal */}
       <AnimatePresence>
         {editing && (
           <motion.div
-            className="fixed inset-0 z-[120] bg-black/50 p-4"
+            className="fixed inset-0 z-[120] bg-black/50 p-4
+                       pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
+                       pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setEditing(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit notice"
           >
             <motion.div
               className="mx-auto mt-16 w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl"
@@ -408,7 +424,7 @@ export default function ExamNoticesPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-2 flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <div className="text-base font-semibold">Edit Notice</div>
                   <div className="mt-1 text-xs text-zinc-500">
                     Started: {whenLabel(editing.start_at)}
@@ -417,7 +433,7 @@ export default function ExamNoticesPage() {
                 <div className="shrink-0 space-x-2">
                   <button
                     onClick={() => setActive(editing.id, !editing.active)}
-                    className={`rounded border px-2 py-1 text-xs hover:bg-zinc-50 ${
+                    className={`h-9 rounded border px-2 py-1 text-xs hover:bg-zinc-50 ${
                       editing.active ? "text-zinc-700" : "text-emerald-700"
                     }`}
                     title={editing.active ? "Set inactive" : "Set live"}
@@ -426,7 +442,7 @@ export default function ExamNoticesPage() {
                   </button>
                   <button
                     onClick={() => askDelete(editing)}
-                    className="rounded border px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                    className="h-9 rounded border px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                   >
                     Delete
                   </button>
@@ -437,19 +453,19 @@ export default function ExamNoticesPage() {
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 rows={5}
-                className="w-full rounded border border-zinc-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-300"
+                className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
               />
 
               <div className="mt-3 flex items-center justify-end gap-2">
                 <button
                   onClick={() => setEditing(null)}
-                  className="rounded px-3 py-1.5 text-sm hover:bg-zinc-100"
+                  className="h-10 rounded px-3 py-1.5 text-sm hover:bg-zinc-100"
                 >
                   Close
                 </button>
                 <button
                   onClick={saveEdit}
-                  className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                  className="h-10 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
                 >
                   Save
                 </button>
@@ -459,11 +475,15 @@ export default function ExamNoticesPage() {
         )}
       </AnimatePresence>
 
-      {/* delete confirm */}
+      {/* Delete confirm */}
       <ConfirmDialog
         open={!!toDelete}
         title="Delete this notice?"
-        message={toDelete ? `"${toDelete.text.slice(0, 80)}${toDelete.text.length > 80 ? "…" : ""}"` : ""}
+        message={
+          toDelete
+            ? `"${toDelete.text.slice(0, 80)}${toDelete.text.length > 80 ? "…" : ""}"`
+            : ""
+        }
         danger
         busy={deleting}
         onCancel={() => (deleting ? null : setToDelete(null))}

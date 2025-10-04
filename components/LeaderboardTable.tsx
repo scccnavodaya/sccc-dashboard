@@ -6,26 +6,25 @@ import { useEffect, useMemo, useState } from "react";
 type Mark = {
   testId: string;
   studentId: string;
-  score?: number | null; // undefined/null = no score recorded
+  score?: number | null;
 };
 
 type Test = {
   id: string;
   section: "MAT" | "ENGLISH" | "MATHS";
-  testDate: string; // ISO date string
+  testDate: string;
 };
 
 type Student = {
   id: string;
   name: string;
-  photo?: string | null; // full URL or null
+  photo?: string | null;
 };
 
 /* Avatar with click-to-preview */
 function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
   const [open, setOpen] = useState(false);
 
-  // close on ESC
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -46,12 +45,12 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
         <img
           src={src}
           alt={name}
-          className="h-8 w-8 cursor-zoom-in rounded-full border border-zinc-200 object-cover"
+          className="h-9 w-9 sm:h-8 sm:w-8 cursor-zoom-in rounded-full border border-zinc-200 object-cover shrink-0"
           onClick={() => setOpen(true)}
         />
       ) : (
         <div
-          className="grid h-8 w-8 cursor-zoom-in place-items-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700"
+          className="grid h-9 w-9 sm:h-8 sm:w-8 cursor-zoom-in place-items-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700 shrink-0"
           onClick={() => setOpen(true)}
           title={name}
         >
@@ -61,23 +60,20 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
 
       {open && (
         <div
-          className="fixed inset-0 z-[70] bg-black/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"
+          aria-label={`${name} photo preview`}
         >
-          <div className="mx-auto mt-16 w-full max-w-xs">
+          <div className="mx-auto mt-16 w-full max-w-xs px-4">
             <div
-              className="relative mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
+              className="relative mx-auto aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {src ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={src}
-                  alt={name}
-                  className="h-full w-full object-cover"
-                />
+                <img src={src} alt={name} className="h-full w-full object-cover" />
               ) : (
                 <div className="grid h-full w-full place-items-center bg-zinc-800 text-white">
                   <span className="text-4xl font-semibold">{initials}</span>
@@ -86,7 +82,7 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
             </div>
             <div className="mt-3 text-center text-sm text-white/90">{name}</div>
             <button
-              className="mx-auto mt-3 block rounded-md bg-white/90 px-4 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
+              className="mx-auto mt-3 block h-10 rounded-md bg-white/90 px-4 text-sm font-medium text-zinc-900 hover:bg-white"
               onClick={() => setOpen(false)}
             >
               Close
@@ -114,9 +110,7 @@ export default function LeaderboardTable({
 
     for (const t of tests) {
       for (const st of students) {
-        const mark = marks.find(
-          (m) => m.testId === t.id && m.studentId === st.id
-        );
+        const mark = marks.find((m) => m.testId === t.id && m.studentId === st.id);
         if (mark && mark.score != null) {
           map.set(st.id, (map.get(st.id) ?? 0) + mark.score);
         }
@@ -126,7 +120,6 @@ export default function LeaderboardTable({
     return students.map((s) => ({
       ...s,
       total: map.get(s.id) ?? 0,
-      // NOTE: we intentionally do not label Absent/Present on public UI now
     }));
   }, [students, tests, marks]);
 
@@ -138,8 +131,19 @@ export default function LeaderboardTable({
   }, [totals]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200">
-      <table className="w-full border-collapse text-sm">
+    <div
+      className="
+        rounded-xl border border-zinc-200
+        overflow-x-auto             /* allow horizontal scroll on narrow phones */
+        w-full max-w-full
+      "
+    >
+      <table
+        className="
+          w-full border-collapse text-sm
+          min-w-[560px]             /* keep columns readable; enables scroll when needed */
+        "
+      >
         <thead className="bg-zinc-50">
           <tr className="text-zinc-600">
             <th className="px-3 py-2 text-left">Rank</th>
@@ -154,17 +158,17 @@ export default function LeaderboardTable({
               key={s.id}
               className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
             >
-              <td className="px-3 py-2">{i + 1}</td>
+              <td className="px-3 py-2 align-middle">{i + 1}</td>
               <td className="px-3 py-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <AvatarPreview src={s.photo} name={s.name} />
-                  <span className="font-medium">{s.name}</span>
+                  <span className="font-medium truncate">{s.name}</span>
                 </div>
               </td>
-              <td className="px-3 py-2 text-right font-semibold">
+              <td className="px-3 py-2 text-right font-semibold tabular-nums">
                 {s.total.toFixed(2).replace(/\.00$/, "")}
               </td>
-              {/* Neutral placeholder for now (no Absent/Present on public) */}
+              {/* Neutral placeholder for now */}
               <td className="px-3 py-2 text-right text-zinc-400">—</td>
             </tr>
           ))}
