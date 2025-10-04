@@ -78,7 +78,7 @@ export default function AdminHeader({
               {/* CENTER: Name + address (centered, clamps to prevent wrap chaos) */}
               <div className="flex flex-col items-center justify-center text-center py-2 min-w-0">
                 <h1 className="brand-title text-sm sm:text-base md:text-lg leading-tight line-clamp-1">
-                  Success Career Coaching Center
+                  Success Career Coaching Centre
                 </h1>
                 <p className="text-[11px] sm:text-xs md:text-sm text-emerald-900/80 truncate w-full">
                   {ADDRESS}

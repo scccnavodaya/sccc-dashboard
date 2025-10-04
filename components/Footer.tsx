@@ -8,7 +8,7 @@ export default function Footer() {
       role="contentinfo"
       aria-label="Site footer"
     >
-      {/* Light, rounded container aligned with page width */}
+      {/* Container with background + border */}
       <div
         className="
           mx-auto w-full max-w-screen-xl
@@ -18,24 +18,18 @@ export default function Footer() {
           shadow-[inset_0_1px_0_rgba(16,185,129,0.15)]
         "
       >
-        <div
-          className="
-            flex flex-col md:flex-row
-            items-center md:items-center
-            justify-between gap-2
-            text-sm sm:text-base text-emerald-800
-          "
-        >
-          {/* Left */}
-          <div className="text-center md:text-left min-w-0">
+        {/* Two-line layout */}
+        <div className="flex flex-col gap-2 text-sm sm:text-base text-emerald-800">
+          {/* Line 1: Left aligned */}
+          <div className="text-left">
             <span className="font-serif text-base italic block sm:inline">
-              Success Career Coaching Center
+              Success Career Coaching Centre
             </span>{" "}
             <span className="whitespace-nowrap">© Stevel Moirangthem</span>
           </div>
 
-          {/* Right */}
-          <div className="text-center md:text-right min-w-0">
+          {/* Line 2: Right aligned */}
+          <div className="text-right">
             <span className="block sm:inline">
               Designed &amp; Developed by{" "}
             </span>

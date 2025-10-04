@@ -14,7 +14,7 @@ type ExamNotice = {
   id: string;
   text: string;
   active: boolean;
-  start_at: string;        // ISO
+  start_at: string; // ISO
   end_at?: string | null;
 };
 
@@ -30,8 +30,8 @@ export default function Header({
   onOpenAdmin?: () => void;
 }) {
   const { scrollY } = useScroll();
-  const h = useTransform(scrollY, [0, 200], [112, 92]);
-  const logo = useTransform(scrollY, [0, 200], [56, 42]);
+  const h = useTransform(scrollY, [0, 200], [112, 92]); // header height shrinks on scroll
+  const logo = useTransform(scrollY, [0, 200], [56, 42]); // logo size shrinks on scroll
 
   // Reference for header height observer
   const headerRef = useRef<HTMLDivElement | null>(null);
@@ -93,14 +93,18 @@ export default function Header({
   }, [notices]);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 safe-x safe-y">
+    <header
+      className="fixed inset-x-0 top-0 z-50 safe-x safe-y"
+      role="banner"
+      aria-label="Site header"
+    >
       <motion.div ref={headerRef} style={{ height: h }} className="flex flex-col">
         <div className="mx-auto w-full max-w-screen-xl px-2.5 sm:px-4 lg:px-6">
           <div
             className="
-              rounded-b-2xl border border-emerald-100
+              overflow-hidden rounded-b-2xl border border-emerald-100
               bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/60
-              shadow-sm overflow-hidden
+              shadow-sm
             "
           >
             {/* Top row */}
@@ -151,19 +155,30 @@ export default function Header({
                 </p>
               </div>
 
-              {/* RIGHT: month picker */}
+              {/* RIGHT: month picker (compact on mobile) */}
               <div className="flex items-center justify-end py-2 pr-1 sm:pr-2 min-w-0">
-                <div className="min-w-0">
-                  <div className="max-w-[52vw] sm:max-w-none">
-                    <MonthPicker value={month} onChange={onMonthChange} />
-                  </div>
+                <div
+                  className="
+                    min-w-0
+                    text-[11px] sm:text-sm             /* shrink font for inner controls */
+                    [transform-origin:right_center]
+                    scale-[0.92] sm:scale-100          /* gentle visual scale only on xs */
+                  "
+                  style={{
+                    // real width cap to prevent overflow (hitbox also shrinks via font-size)
+                    maxWidth: "min(52vw, 240px)",
+                  }}
+                >
+                  <MonthPicker value={month} onChange={onMonthChange} />
                 </div>
               </div>
             </div>
 
             {/* Slim LatestExam strip (LIVE ticker) */}
             <div className="border-t border-emerald-100/80 px-2 sm:px-3 pb-2">
-              <LatestExamTicker items={liveItems} intervalMs={30000} />
+              <div className="min-w-0 overflow-hidden">
+                <LatestExamTicker items={liveItems} intervalMs={30000} />
+              </div>
             </div>
           </div>
         </div>

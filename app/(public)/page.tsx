@@ -54,7 +54,7 @@ export default function HomePage() {
   const { tests: liveTests, marks: liveMarks } = usePublicScores(month);
   const { notices: liveNotices } = usePublicNotices();
 
-  // Live exam ticker
+  // Live exam ticker (header)
   const [examTexts, setExamTexts] = useState<LatestExamItem[]>([]);
   useEffect(() => {
     let alive = true;
@@ -139,7 +139,7 @@ export default function HomePage() {
     return dateOpt;
   }, [sectionForDropdown, dateOpt, latestTest]);
 
-  // Attendance
+  // Attendance helpers
   const subjectTestIds = useMemo(
     () => new Set(subjectTests.map((t) => t.id)),
     [subjectTests]
@@ -170,7 +170,7 @@ export default function HomePage() {
     return liveTests.length;
   }, [sectionForDropdown, subjectTests.length, liveTests.length]);
 
-  // Notices live = exactly what the carousel shows
+  // Notices live count
   const noticeLiveCount = useMemo(
     () => (Array.isArray(liveNotices) ? liveNotices.length : 0),
     [liveNotices]
@@ -338,7 +338,7 @@ export default function HomePage() {
         }}
       />
 
-      {/* Spacer for fixed header (slightly shorter on very small phones) */}
+      {/* Spacer for fixed header; prevents overlap */}
       <div className="h-[96px] sm:h-[112px]" />
 
       <div className="mobile-rescue">
@@ -411,16 +411,15 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* Side-by-side on md+, stacked on mobile. Both cards flex and their content scrolls. */}
-                <div className="mt-3 flex flex-col md:flex-row items-stretch gap-4 md:gap-5 min-w-0">
+                {/* ✅ GRID: 1 col on mobile (Notice below), 2 cols on md+ (side-by-side) */}
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 items-stretch min-w-0">
                   {/* LEFT: Section / Overall */}
                   <motion.div
                     key={`left-${section}-${dateOpt}-${month}`}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, ease: "easeOut" }}
-                    className={CARD_CLASS}
-                    style={{ minHeight: "220px" }}
+                    className={CARD_CLASS + " order-1"}
                   >
                     <AnimatePresence mode="wait">
                       {section === "OVERALL" ? (
@@ -489,14 +488,13 @@ export default function HomePage() {
                     </AnimatePresence>
                   </motion.div>
 
-                  {/* RIGHT: Notice Board */}
+                  {/* RIGHT (on md+) / BELOW (on mobile): Notice Board */}
                   <motion.div
                     key={`right-${section}`}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, ease: "easeOut", delay: 0.05 }}
-                    className={CARD_CLASS}
-                    style={{ minHeight: "220px" }}
+                    className={CARD_CLASS + " order-2"}
                   >
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <h3 className="text-base font-semibold truncate">Notice Board</h3>
@@ -504,7 +502,7 @@ export default function HomePage() {
                         Auto-scrolling
                       </span>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-hidden">
+                    <div className="min-h-[180px] md:min-h-[220px] flex-1 overflow-hidden">
                       <NoticeCarousel items={liveNotices} barClassName={activeTheme.bar} />
                     </div>
                   </motion.div>
