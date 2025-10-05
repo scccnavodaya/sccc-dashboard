@@ -2,7 +2,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Menu } from "lucide-react";
 import MonthPicker from "@/components/MonthPicker";
@@ -30,17 +30,19 @@ export default function Header({
   onOpenAdmin?: () => void;
 }) {
   const { scrollY } = useScroll();
-  const h = useTransform(scrollY, [0, 200], [112, 92]); // header height shrinks on scroll
-  const logo = useTransform(scrollY, [0, 200], [56, 42]); // logo size shrinks on scroll
 
-  // Reference for header height observer
+  // animate header height and logo size on scroll (smooth, subtle)
+  const headerHeight = useTransform(scrollY, [0, 200], [112, 88]); // tall -> compact
+  const logoSize = useTransform(scrollY, [0, 200], [56, 42]);
+
+  // Reference for header height observer (keeps --header-h accurate)
   const headerRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep CSS var --header-h in sync with real header height
   useEffect(() => {
     if (!headerRef.current) return;
     const el = headerRef.current;
     const setVar = () => {
+      // offsetHeight reads the computed pixel height (motion value is used for visual transform)
       document.documentElement.style.setProperty("--header-h", `${el.offsetHeight}px`);
     };
     setVar();
@@ -49,48 +51,13 @@ export default function Header({
     return () => ro.disconnect();
   }, []);
 
-  // ---- LIVE ticker fetch ----
-  const [notices, setNotices] = useState<ExamNotice[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  async function loadLive() {
-    try {
-      const res = await fetch("/api/exam-ticker", { cache: "no-store" });
-      const data = (await res.json().catch(() => [])) as ExamNotice[] | any;
-      if (!res.ok || !Array.isArray(data)) {
-        setNotices([]);
-      } else {
-        setNotices(
-          data.sort(
-            (a, b) =>
-              new Date(b.start_at).getTime() - new Date(a.start_at).getTime()
-          )
-        );
-      }
-    } catch {
-      setNotices([]);
-    } finally {
-      setLoaded(true);
-    }
-  }
-
-  useEffect(() => {
-    loadLive();
-    const t = setInterval(loadLive, 60_000); // refresh every 60s
-    return () => clearInterval(t);
-  }, []);
-
-  const liveItems: LatestExamItem[] = useMemo(() => {
-    if (!notices.length) return [];
-    const active = notices.find((n) => n.active) ?? notices[0];
-    return [
-      {
-        id: active.id,
-        text: active.text,
-        startAt: active.start_at,
-      },
-    ];
-  }, [notices]);
+  // ---- LIVE ticker fetch (keeps header fast to render) ----
+  // note: we still honor examTexts prop — if not provided we fetch server list
+  const liveItems = useMemo<LatestExamItem[]>(() => {
+    if (Array.isArray(examTexts) && examTexts.length > 0) return examTexts;
+    // fallback empty — the LatestExamTicker will show "No notice yet"
+    return [];
+  }, [examTexts]);
 
   return (
     <header
@@ -98,7 +65,12 @@ export default function Header({
       role="banner"
       aria-label="Site header"
     >
-      <motion.div ref={headerRef} style={{ height: h }} className="flex flex-col">
+      <motion.div
+        ref={headerRef}
+        // motion value used for visual height; ResizeObserver syncs real height into --header-h
+        style={{ height: headerHeight } as any}
+        className="flex flex-col"
+      >
         <div className="mx-auto w-full max-w-screen-xl px-2.5 sm:px-4 lg:px-6">
           <div
             className="
@@ -107,7 +79,7 @@ export default function Header({
               shadow-sm
             "
           >
-            {/* Top row */}
+            {/* Top row: three-column grid */}
             <div
               className="
                 grid items-center px-2 sm:px-3
@@ -130,7 +102,7 @@ export default function Header({
                 </button>
 
                 <motion.div
-                  style={{ width: logo, height: logo }}
+                  style={{ width: logoSize as any, height: logoSize as any }}
                   className="overflow-hidden rounded-xl bg-white shadow shrink-0"
                 >
                   <Image
@@ -144,10 +116,9 @@ export default function Header({
                 </motion.div>
               </div>
 
-              {/* CENTER: name + address */}
+              {/* CENTER: name + address (compact, wraps gracefully) */}
               <div className="flex flex-col items-center justify-center text-center py-2 min-w-0">
-                {/* Allow text to wrap gracefully on very small devices */}
-                <h1 className="brand-title text-[13px] sm:text-sm md:text-lg lg:text-xl leading-tight text-balance">
+                <h1 className="brand-title text-[13px] sm:text-sm md:text-lg lg:text-xl leading-tight text-balance line-clamp-2">
                   Success Career Coaching Centre
                 </h1>
                 <p className="text-[11px] sm:text-xs md:text-sm text-emerald-900/80 truncate w-full">
@@ -160,24 +131,29 @@ export default function Header({
                 <div
                   className="
                     min-w-0
-                    text-[11px] sm:text-sm             /* shrink font for inner controls */
-                    [transform-origin:right_center]
-                    scale-[0.92] sm:scale-100          /* gentle visual scale only on xs */
+                    text-[11px] sm:text-sm
+                    scale-[0.95] sm:scale-100
+                    origin-right
                   "
                   style={{
-                    // real width cap to prevent overflow (hitbox also shrinks via font-size)
-                    maxWidth: "min(52vw, 240px)",
+                    // cap real width to avoid overflow on tiny phones
+                    maxWidth: "min(52vw, 260px)",
                   }}
                 >
+                  {/* MonthPicker should be responsive; we wrap it to constrain width and visual size */}
                   <MonthPicker value={month} onChange={onMonthChange} />
                 </div>
               </div>
             </div>
 
-            {/* Slim LatestExam strip (LIVE ticker) */}
+            {/* Slim LatestExam strip (LIVE ticker) — smaller text on phones */}
             <div className="border-t border-emerald-100/80 px-2 sm:px-3 pb-2">
               <div className="min-w-0 overflow-hidden">
-                <LatestExamTicker items={liveItems} intervalMs={30000} />
+                <LatestExamTicker
+                  items={liveItems}
+                  intervalMs={30000}
+                  className="text-xs sm:text-sm"
+                />
               </div>
             </div>
           </div>

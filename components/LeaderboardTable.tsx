@@ -45,12 +45,12 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
         <img
           src={src}
           alt={name}
-          className="h-9 w-9 sm:h-8 sm:w-8 cursor-zoom-in rounded-full border border-zinc-200 object-cover shrink-0"
+          className="h-8 w-8 sm:h-9 sm:w-9 cursor-zoom-in rounded-full border border-zinc-200 object-cover shrink-0"
           onClick={() => setOpen(true)}
         />
       ) : (
         <div
-          className="grid h-9 w-9 sm:h-8 sm:w-8 cursor-zoom-in place-items-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700 shrink-0"
+          className="grid h-8 w-8 sm:h-9 sm:w-9 cursor-zoom-in place-items-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700 shrink-0"
           onClick={() => setOpen(true)}
           title={name}
         >
@@ -112,7 +112,7 @@ export default function LeaderboardTable({
       for (const st of students) {
         const mark = marks.find((m) => m.testId === t.id && m.studentId === st.id);
         if (mark && mark.score != null) {
-          map.set(st.id, (map.get(st.id) ?? 0) + mark.score);
+          map.set(st.id, (map.get(st.id) ?? 0) + (Number(mark.score) || 0));
         }
       }
     }
@@ -126,7 +126,7 @@ export default function LeaderboardTable({
   // sort by total desc
   const ranked = useMemo(() => {
     const copy = [...totals];
-    copy.sort((a, b) => b.total - a.total);
+    copy.sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
     return copy;
   }, [totals]);
 
@@ -141,15 +141,16 @@ export default function LeaderboardTable({
       <table
         className="
           w-full border-collapse text-sm
-          min-w-[560px]             /* keep columns readable; enables scroll when needed */
+          min-w-[420px]             /* lowered min width for better mobile fit */
         "
       >
         <thead className="bg-zinc-50">
           <tr className="text-zinc-600">
-            <th className="px-3 py-2 text-left">Rank</th>
-            <th className="px-3 py-2 text-left">Student</th>
-            <th className="px-3 py-2 text-right">Monthly Total</th>
-            <th className="px-3 py-2 text-right">Status</th>
+            <th className="px-3 py-2 text-left text-xs sm:text-sm">Rank</th>
+            <th className="px-3 py-2 text-left text-xs sm:text-sm">Student</th>
+            <th className="px-3 py-2 text-right text-xs sm:text-sm">Monthly Total</th>
+            {/* hide status on smallest screens to reduce width pressure */}
+            <th className="px-3 py-2 text-right text-xs sm:text-sm hidden sm:table-cell">Status</th>
           </tr>
         </thead>
         <tbody>
@@ -158,18 +159,18 @@ export default function LeaderboardTable({
               key={s.id}
               className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
             >
-              <td className="px-3 py-2 align-middle">{i + 1}</td>
+              <td className="px-3 py-2 align-middle text-xs sm:text-sm">{i + 1}</td>
               <td className="px-3 py-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <AvatarPreview src={s.photo} name={s.name} />
-                  <span className="font-medium truncate">{s.name}</span>
+                  <span className="font-medium truncate text-sm">{s.name}</span>
                 </div>
               </td>
-              <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                {s.total.toFixed(2).replace(/\.00$/, "")}
+              <td className="px-3 py-2 text-right font-semibold tabular-nums text-sm">
+                {(Number(s.total) || 0).toFixed(2).replace(/\.00$/, "")}
               </td>
-              {/* Neutral placeholder for now */}
-              <td className="px-3 py-2 text-right text-zinc-400">—</td>
+              {/* Neutral placeholder for now (hidden on xs) */}
+              <td className="px-3 py-2 text-right text-zinc-400 hidden sm:table-cell">—</td>
             </tr>
           ))}
           {ranked.length === 0 && (

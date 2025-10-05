@@ -16,10 +16,13 @@ type BaseStudent = {
 type MaxScore = number | ((s: BaseStudent) => number);
 
 type SectionProps = {
+  /** omit or "section" = section table with present/absent */
   mode?: "section";
   section: SectionKey;
   students: BaseStudent[];
+  /** optional height class for scrollable body */
   fixedBodyHeightClass?: string;
+  /** max score to display (number or function per student) */
   maxScore?: MaxScore;
 };
 
@@ -63,14 +66,14 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
         <img
           src={src}
           alt={name}
-          className="h-7 w-7 sm:h-6 sm:w-6 cursor-zoom-in rounded-full border border-zinc-200 object-cover shrink-0"
+          className="h-7 w-7 sm:h-7 sm:w-7 cursor-zoom-in rounded-full border border-zinc-200 object-cover shrink-0"
           onClick={() => setOpen(true)}
         />
       ) : (
         <button
           onClick={() => setOpen(true)}
           title={name}
-          className="grid h-7 w-7 sm:h-6 sm:w-6 place-items-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700 shrink-0"
+          className="grid h-7 w-7 sm:h-7 sm:w-7 place-items-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700 shrink-0"
         >
           {initials}
         </button>
@@ -115,9 +118,10 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
 }
 
 export default function SectionGrid(props: Props) {
-  // Keep your height option but give a sensible mobile default window.
+  // Taller default on small screens so content breathes; still scrolls inside.
   const fixedBodyHeightClass =
-    props.fixedBodyHeightClass ?? "h-[136px] sm:h-[160px] md:h-[180px]";
+    props.fixedBodyHeightClass ??
+    "h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px]";
 
   const students = props.students;
 
@@ -164,90 +168,92 @@ export default function SectionGrid(props: Props) {
   }
 
   const textSize = "text-[12px] sm:text-xs";
-  const headPad = "py-1";
-  const rowPad = "py-1.5";
+  const headPad = "py-1.5";
+  const rowPad = "py-2";
 
   return (
     <div
       className="
         rounded-2xl border border-zinc-200 card
         w-full max-w-full
-        table-scroll            /* enable horizontal scroll on very small phones */
-        mobile-rescue           /* guard against side overflow */
+        overflow-hidden
       "
     >
+      {/* Scroll inside body; add horizontal scroll only on *very* small widths */}
       <div className={`${fixedBodyHeightClass} overflow-y-auto`}>
-        <table
-          className={`w-full border-collapse ${textSize} min-w-[520px]`}
-          aria-label="Section scores"
-        >
-          <thead className="sticky top-0 bg-zinc-50 sticky-top">
-            <tr className="text-zinc-600">
-              <th className={`px-3 ${headPad} text-left no-shrink`}>Rank</th>
-              <th className={`px-3 ${headPad} text-left`}>Student</th>
-              <th className={`px-3 ${headPad} text-right`}>Score</th>
-              <th className={`px-3 ${headPad} text-right`}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rowsPresent.map((r, i) => (
-              <tr
-                key={`p-${r.id}`}
-                className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
-              >
-                <td className={`px-3 ${rowPad} align-middle no-shrink`}>{i + 1}</td>
-                <td className={`px-3 ${rowPad}`}>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <AvatarPreview src={r.photo ?? undefined} name={r.name} />
-                    <span className="truncate font-medium break-anywhere">{r.name}</span>
-                  </div>
-                </td>
-                <td className={`px-3 ${rowPad} text-right font-semibold tabular-nums`}>
-                  {renderScore(r.score, r.src)}
-                </td>
-                <td className={`px-3 ${rowPad} text-right`}>
-                  {mode === "section" ? (
-                    <span className="rounded-full bg-emerald-100 px-2 py-[1px] text-[10px] font-medium text-emerald-800">
-                      Present
-                    </span>
-                  ) : (
-                    <span className="text-zinc-400">—</span>
-                  )}
-                </td>
+        <div className="w-full overflow-x-auto">
+          <table
+            className={`w-full border-collapse ${textSize} min-w-[420px] sm:min-w-[520px]`}
+            aria-label={props.mode === "overall" ? "Overall scores" : `${(props as SectionProps).section} test scores`}
+          >
+            <thead className="sticky top-0 bg-zinc-50">
+              <tr className="text-zinc-600">
+                <th className={`px-3 ${headPad} text-left whitespace-nowrap`}>Rank</th>
+                <th className={`px-3 ${headPad} text-left`}>Student</th>
+                <th className={`px-3 ${headPad} text-right whitespace-nowrap`}>Score</th>
+                <th className={`px-3 ${headPad} text-right whitespace-nowrap`}>Status</th>
               </tr>
-            ))}
-
-            {mode === "section" &&
-              rowsAbsent.map((r) => (
+            </thead>
+            <tbody>
+              {rowsPresent.map((r, i) => (
                 <tr
-                  key={`a-${r.id}`}
+                  key={`p-${r.id}`}
                   className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
                 >
-                  <td className={`px-3 ${rowPad} no-shrink`}>—</td>
+                  <td className={`px-3 ${rowPad} align-middle whitespace-nowrap`}>{i + 1}</td>
                   <td className={`px-3 ${rowPad}`}>
                     <div className="flex items-center gap-2 min-w-0">
                       <AvatarPreview src={r.photo ?? undefined} name={r.name} />
                       <span className="truncate font-medium break-anywhere">{r.name}</span>
                     </div>
                   </td>
-                  <td className={`px-3 ${rowPad} text-right text-zinc-400`}>—</td>
+                  <td className={`px-3 ${rowPad} text-right font-semibold tabular-nums`}>
+                    {renderScore(r.score, r.src)}
+                  </td>
                   <td className={`px-3 ${rowPad} text-right`}>
-                    <span className="rounded-full bg-red-100 px-2 py-[1px] text-[10px] font-medium text-red-700">
-                      Absent
-                    </span>
+                    {mode === "section" ? (
+                      <span className="rounded-full bg-emerald-100 px-2 py-[1px] text-[10px] font-medium text-emerald-800">
+                        Present
+                      </span>
+                    ) : (
+                      <span className="text-zinc-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
 
-            {rowsPresent.length + rowsAbsent.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
-                  No data
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              {mode === "section" &&
+                rowsAbsent.map((r) => (
+                  <tr
+                    key={`a-${r.id}`}
+                    className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
+                  >
+                    <td className={`px-3 ${rowPad} whitespace-nowrap`}>—</td>
+                    <td className={`px-3 ${rowPad}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <AvatarPreview src={r.photo ?? undefined} name={r.name} />
+                        <span className="truncate font-medium break-anywhere">{r.name}</span>
+                      </div>
+                    </td>
+                    <td className={`px-3 ${rowPad} text-right text-zinc-400`}>—</td>
+                    <td className={`px-3 ${rowPad} text-right`}>
+                      <span className="rounded-full bg-red-100 px-2 py-[1px] text-[10px] font-medium text-red-700">
+                        Absent
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+
+              {rowsPresent.length + rowsAbsent.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
+                    No data
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

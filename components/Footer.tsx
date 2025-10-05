@@ -4,36 +4,47 @@
 export default function Footer() {
   return (
     <footer
-      className="bg-transparent safe-x safe-y app-footer"
+      className="
+        safe-x safe-y 
+        bg-transparent 
+        app-footer
+        w-full
+        z-40
+      "
       role="contentinfo"
       aria-label="Site footer"
     >
-      {/* Container with background + border */}
+      {/* Outer container with subtle gradient + border top */}
       <div
         className="
           mx-auto w-full max-w-screen-xl
-          rounded-t-2xl border-t border-emerald-200
+          border-t border-emerald-200
           bg-gradient-to-r from-emerald-50 to-teal-50
-          px-4 sm:px-6 lg:px-8 py-4 sm:py-6
+          px-3 sm:px-6 lg:px-8 py-3 sm:py-4
           shadow-[inset_0_1px_0_rgba(16,185,129,0.15)]
+          rounded-t-2xl
         "
       >
-        {/* Two-line layout */}
-        <div className="flex flex-col gap-2 text-sm sm:text-base text-emerald-800">
-          {/* Line 1: Left aligned */}
-          <div className="text-left">
-            <span className="font-serif text-base italic block sm:inline">
+        {/* Two-line flex layout */}
+        <div
+          className="
+            flex flex-col sm:flex-row
+            justify-between items-center sm:items-baseline
+            gap-2 text-[12px] sm:text-sm md:text-base text-emerald-800
+          "
+        >
+          {/* Left-aligned line */}
+          <div className="text-left w-full sm:w-auto">
+            <span className="font-serif text-sm sm:text-base italic">
               Success Career Coaching Centre
             </span>{" "}
             <span className="whitespace-nowrap">© Stevel Moirangthem</span>
           </div>
 
-          {/* Line 2: Right aligned */}
-          <div className="text-right">
-            <span className="block sm:inline">
-              Designed &amp; Developed by{" "}
-            </span>
-            <span className="font-serif text-base italic hover:text-emerald-600 transition-colors">
+          {/* Right-aligned line */}
+          <div className="text-right w-full sm:w-auto">
+            <span>Designed &amp; Developed by </span>
+            <span className="font-serif text-sm sm:text-base italic hover:text-emerald-600 transition-colors">
               @ Karam Suresh
             </span>
           </div>

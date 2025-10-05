@@ -1,3 +1,4 @@
+// components/ChipBar.tsx
 "use client";
 
 import { motion, LayoutGroup } from "framer-motion";
@@ -32,9 +33,16 @@ export default function ChipBar({
       role="tablist"
       aria-label="Sections"
     >
-      <div className="flex items-center gap-1.5 sm:gap-2 px-0.5 sm:px-0 w-max min-w-full">
+      {/* scrollable row; uses snap for nicer touch UX */}
+      <div
+        className="
+          flex items-center gap-1 px-1 w-max min-w-full
+          snap-x snap-mandatory
+          -mx-1
+        "
+      >
         <LayoutGroup id="section-chips">
-          {items.map((it) => {
+          {items.map((it, idx) => {
             const isActive = active === it.key;
             const theme = colorByKey[it.key];
             return (
@@ -44,17 +52,24 @@ export default function ChipBar({
                 whileTap={{ scale: 0.98 }}
                 role="tab"
                 aria-selected={isActive}
+                aria-controls={`panel-${it.key}`}
+                tabIndex={0}
+                // snap align makes the clicked/active chip center when scrolled programmatically by user agent
                 className={`
+                  snap-center
                   relative rounded-full
-                  h-10 sm:h-9
-                  px-3.5 sm:px-4
-                  text-[13px] sm:text-sm font-medium
+                  h-9 sm:h-10
+                  px-3 sm:px-4
+                  text-sm sm:text-sm font-medium
                   whitespace-nowrap
                   transition-colors
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300
                   ${isActive ? theme.text : "text-zinc-500 hover:text-zinc-800"}
                 `}
+                style={{ WebkitTapHighlightColor: "transparent" }}
               >
                 {it.label}
+
                 {isActive && (
                   <motion.span
                     layoutId="chip-pill-active"

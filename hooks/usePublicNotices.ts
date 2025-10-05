@@ -1,14 +1,16 @@
 // hooks/usePublicNotices.ts
+"use client";
+
 import { useEffect, useState, useCallback } from "react";
 
 export type PublicNotice = {
   id: string;
   type: "image" | "video";
-  title: string;
-  body: string;
+  title?: string | null;
+  body?: string | null;
   src: string;
   poster?: string | null;
-  startAt?: string;
+  startAt?: string | null;
 };
 
 type NoticesState = {
@@ -29,14 +31,18 @@ export function usePublicNotices(): NoticesState {
     try {
       const r = await fetch("/api/notices", { cache: "no-store" });
       if (!r.ok) throw new Error(`Request failed (${r.status})`);
+
       const data = await r.json();
 
       if (Array.isArray(data)) {
         setNotices(data as PublicNotice[]);
       } else {
-        throw new Error("Invalid data shape");
+        console.error("[usePublicNotices] Unexpected response:", data);
+        setNotices([]);
+        setError("Invalid data shape");
       }
     } catch (e: any) {
+      console.error("[usePublicNotices] fetch error:", e);
       setNotices([]);
       setError(e?.message || "Failed to load notices");
     } finally {

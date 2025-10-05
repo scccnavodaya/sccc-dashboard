@@ -15,8 +15,18 @@ export type StatsResponse = {
 // Abortable SWR fetcher (SWR v2 passes { signal })
 async function fetcher(key: string, { signal }: { signal?: AbortSignal }) {
   const res = await fetch(key, { cache: "no-store", signal });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || "Failed to load stats");
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {
+    // ignore JSON parse error, leave data as {}
+  }
+
+  if (!res.ok) {
+    const msg = data?.error || `Failed to load stats (status ${res.status})`;
+    console.error("[usePublicStats] fetch failed:", msg);
+    throw new Error(msg);
+  }
 
   // Shape guard + backward-compat normalization
   const normalized: StatsResponse = {
@@ -25,13 +35,14 @@ async function fetcher(key: string, { signal }: { signal?: AbortSignal }) {
     testsInMonth: data.testsInMonth ?? data.testsCount ?? 0,
     noticesLive: data.noticesLive ?? 0,
   };
+
   return normalized;
 }
 
 type Options = {
-  /** ms; set 0 to disable auto refresh (default 15s like before) */
+  /** Auto-refresh interval in ms; set 0 to disable (default 15s) */
   refreshInterval?: number;
-  /** enable realtime supabase triggers (default true) */
+  /** Enable realtime Supabase triggers (default true) */
   realtime?: boolean;
 };
 
@@ -53,7 +64,7 @@ export function usePublicStats(ym: string, opts: Options = {}) {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     focusThrottleInterval: 10_000,
-    refreshInterval,                 // paused below when tab hidden
+    refreshInterval, // paused below when tab hidden
     errorRetryCount: 2,
     errorRetryInterval: 5_000,
   });
@@ -66,7 +77,6 @@ export function usePublicStats(ym: string, opts: Options = {}) {
       if (document.hidden) {
         if (!paused) {
           paused = true;
-          // pause by setting 0 and trigger a quiet mutate later if you want
         }
       } else {
         if (paused) {
@@ -79,11 +89,14 @@ export function usePublicStats(ym: string, opts: Options = {}) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refreshInterval, mutate]);
 
-  // Supabase realtime (client created once)
+  // Supabase realtime client created once
   const supabase: SupabaseClient | null = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
+    if (!url || !key) {
+      console.warn("[usePublicStats] Missing NEXT_PUBLIC_SUPABASE_URL or KEY");
+      return null;
+    }
     return createClient(url, key);
   }, []);
 
@@ -103,8 +116,10 @@ export function usePublicStats(ym: string, opts: Options = {}) {
 
     channelRef.current = ch;
     return () => {
-      channelRef.current && supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [ym, realtime, supabase, mutate]);
 

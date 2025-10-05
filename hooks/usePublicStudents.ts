@@ -16,18 +16,26 @@ async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
     cache: "no-store",
     signal,
   });
+
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    // ignore parse error; will handle below
+  }
+
   if (!res.ok) {
-    let msg = "Failed to load students";
-    try {
-      const j = await res.json();
-      if (j?.error) msg = j.error;
-    } catch {}
+    const msg = data?.error || `Failed to load students (status ${res.status})`;
+    console.error("[usePublicStudents] fetch failed:", msg);
     throw new Error(msg);
   }
-  const data = (await res.json()) as unknown;
 
   // tiny shape guard
-  if (!Array.isArray(data)) throw new Error("Invalid students payload");
+  if (!Array.isArray(data)) {
+    console.error("[usePublicStudents] Invalid students payload:", data);
+    throw new Error("Invalid students payload");
+  }
+
   return data as PublicStudent[];
 }
 
@@ -36,10 +44,9 @@ async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
  * Example: usePublicStudents({ q: search })
  */
 export function usePublicStudents(opts?: { q?: string }) {
-  const key =
-    opts?.q?.trim()
-      ? `/api/public/students?q=${encodeURIComponent(opts.q.trim())}`
-      : "/api/public/students";
+  const key = opts?.q?.trim()
+    ? `/api/public/students?q=${encodeURIComponent(opts.q.trim())}`
+    : "/api/public/students";
 
   const { data, error, isLoading, mutate } = useSWR<PublicStudent[]>(
     key,

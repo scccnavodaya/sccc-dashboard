@@ -1,12 +1,12 @@
+// components/LatestExamTicker.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useMemo, useState } from "react";
 
 export type LatestExamItem = {
   id: string;
   text: string;       // one-line announcement
-  startAt?: string;   // ISO; shows NEW if within last 24h
+  startAt?: string;   // ISO; shows NEW if within last 24h (kept for API parity)
 };
 
 function isFresh(startAt?: string) {
@@ -16,113 +16,114 @@ function isFresh(startAt?: string) {
   return now - then < 24 * 60 * 60 * 1000; // 24h
 }
 
+function joinTexts(items: LatestExamItem[]) {
+  return items
+    .map((i) => (i?.text || "").trim())
+    .filter(Boolean)
+    .join("   •   ");
+}
+
 export default function LatestExamTicker({
   items = [],
-  intervalMs = 30000,
+  intervalMs = 30000, // kept for compatibility; marquee is time-based CSS
   className = "",
 }: {
   items?: LatestExamItem[];
   intervalMs?: number;
   className?: string;
 }) {
-  const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
-  const hasItems = items.length > 0;
-  const ref = useRef<HTMLDivElement>(null);
+  const line = useMemo(() => joinTexts(items), [items]);
 
-  useEffect(() => {
-    if (!hasItems || paused) return;
-    const id = setInterval(() => setIdx((i) => (i + 1) % items.length), intervalMs);
-    return () => clearInterval(id);
-  }, [hasItems, paused, items.length, intervalMs]);
-
-  useEffect(() => {
-    const onBlur = () => setPaused(true);
-    const onFocus = () => setPaused(false);
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, []);
-
-  if (!hasItems) {
+  if (!items.length || !line) {
     return (
       <div
-        className={`flex min-h-[36px] items-center rounded-lg bg-gradient-to-r from-emerald-50/70 to-teal-50/70 px-2.5 sm:px-3 text-xs sm:text-sm text-zinc-600 ${className}`}
+        className={`flex items-center rounded-md border border-emerald-100 bg-emerald-50/70 px-2 py-1 text-[11px] sm:text-xs text-emerald-800 ${className}`}
+        style={{ lineHeight: "1.25rem", minHeight: "1.25rem" }}
       >
-        No notice yet
+        <span className="mr-2 shrink-0 rounded bg-emerald-600 px-1.5 py-[1px] text-[10px] font-semibold text-white">
+          Latest
+        </span>
+        No exam notice yet
       </div>
     );
   }
 
-  const current = items[idx];
+  // Duplicate once so the marquee loops seamlessly
+  const loopText = `${line}   •   ${line}`;
+
+  // If ANY item is fresh, show a small NEW badge (optional, subtle)
+  const anyFresh = items.some((i) => isFresh(i.startAt));
 
   return (
     <div
-      ref={ref}
       className={`
-        relative flex min-h-[36px] items-center overflow-hidden
-        rounded-lg bg-gradient-to-r from-emerald-50/70 to-teal-50/70
-        px-2.5 sm:px-3 text-sm w-full max-w-full
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300
+        relative w-full overflow-hidden rounded-md
+        border border-emerald-100 bg-emerald-50
         ${className}
       `}
+      aria-label="Latest Exam Notice"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      onKeyDown={(e) => {
-        if (e.key === "ArrowRight") setIdx((i) => (i + 1) % items.length);
-        if (e.key === "ArrowLeft") setIdx((i) => (i - 1 + items.length) % items.length);
-      }}
-      aria-live="polite"
-      role="region"
-      aria-label="Latest exam notices"
-      tabIndex={0}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
     >
-      {/* Label chip */}
-      <span className="mr-2 shrink-0 rounded-md bg-emerald-600/90 px-1.5 py-0.5 text-[10px] sm:text-xs font-semibold tracking-wide text-white">
-        Latest Exam
-      </span>
+      <div
+        className="
+          flex items-center gap-2
+          px-2 sm:px-3 py-1
+          text-[11px] sm:text-xs font-medium text-emerald-800
+        "
+        style={{ lineHeight: "1.25rem", minHeight: "1.25rem" }}
+      >
+        {/* Fixed chip on the left so it doesn't scroll away */}
+        <span className="mr-1 shrink-0 rounded bg-emerald-600 px-1.5 py-[1px] text-[10px] font-semibold text-white">
+          Latest Exam
+        </span>
 
-      {/* Animated text */}
-      <div className="relative flex-1 min-w-0">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={current.id}
-            initial={{ y: 8, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -8, opacity: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="flex items-center gap-2"
+        {/* Optional tiny NEW badge if something fresh exists */}
+        {anyFresh && (
+          <span className="mr-1 hidden sm:inline-block shrink-0 rounded bg-red-600 px-1.5 py-[1px] text-[10px] font-semibold text-white">
+            NEW
+          </span>
+        )}
+
+        {/* Marquee line */}
+        <div className="relative flex-1 overflow-hidden">
+          <div
+            className="ticker inline-block whitespace-nowrap will-change-transform"
+            // pause via inline style to avoid className thrash
+            style={{
+              animationPlayState: paused ? "paused" : "running",
+            }}
+            aria-live="polite"
           >
-            <span className="truncate" title={current.text}>
-              {current.text}
-            </span>
-            {isFresh(current.startAt) && (
-              <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] sm:text-xs font-medium text-white">
-                NEW
-              </span>
-            )}
-          </motion.div>
-        </AnimatePresence>
+            {loopText}
+          </div>
+        </div>
       </div>
 
-      {/* Tiny nav dots (bigger touch targets, accessible) */}
-      <div className="ml-2 flex shrink-0 items-center gap-1.5">
-        {items.map((_, i) => (
-          <button
-            key={i}
-            aria-label={`Show notice ${i + 1}`}
-            onClick={() => setIdx(i)}
-            className={`
-              h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full transition
-              ${i === idx ? "bg-emerald-700" : "bg-emerald-300 hover:bg-emerald-400"}
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300
-            `}
-          />
-        ))}
-      </div>
+      {/* Local keyframes so no Tailwind config change is needed */}
+      <style jsx>{`
+        .ticker {
+          animation: sccc-marquee 22s linear infinite;
+          padding-left: 100%;
+        }
+        @keyframes sccc-marquee {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+        /* Slightly slower on very small phones to improve legibility */
+        @media (max-width: 420px) {
+          .ticker {
+            animation-duration: 26s;
+          }
+        }
+      `}</style>
     </div>
   );
 }

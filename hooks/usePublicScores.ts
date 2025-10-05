@@ -15,7 +15,7 @@ export type PublicMark = {
   score: number | null; // null = absent
 };
 
-type ScoresResponse = {
+export type ScoresResponse = {
   tests: PublicTest[];
   marks: PublicMark[];
 };
@@ -33,6 +33,7 @@ async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
       const j = await res.json();
       if (j?.error) msg = j.error;
     } catch {}
+    console.error("[usePublicScores] fetch failed:", res.status, msg);
     throw new Error(msg);
   }
   const data = (await res.json()) as unknown;
@@ -44,6 +45,7 @@ async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
     !Array.isArray((data as any).tests) ||
     !Array.isArray((data as any).marks)
   ) {
+    console.error("[usePublicScores] Invalid scores payload:", data);
     throw new Error("Invalid scores payload");
   }
   return data as ScoresResponse;
@@ -62,17 +64,13 @@ export function usePublicScores(month: string, opts: Options = {}) {
     data,
     error,
     isLoading,
-    mutate,            // call to refetch
+    mutate, // call to refetch
   } = useSWR<ScoresResponse>(key, swrFetcher, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    // Avoid hammering the server if you tab in/out quickly
-    focusThrottleInterval: 10_000,
-    // Keep previous month’s data visible while new month loads
-    keepPreviousData: true,
-    // Optional auto-refresh
-    refreshInterval,
-    // Don’t retry forever on hard errors (like 401/403)
+    focusThrottleInterval: 10_000, // avoid hammering on quick tab switches
+    keepPreviousData: true,        // keep old data visible while new loads
+    refreshInterval,               // optional auto-refresh
     errorRetryCount: 2,
     errorRetryInterval: 5_000,
   });
