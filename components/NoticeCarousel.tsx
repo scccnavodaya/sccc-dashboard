@@ -38,7 +38,7 @@ export default function NoticeCarousel({
   const has = items.length > 0;
   const current = items[idx];
 
-  // auto-advance
+  // auto-advance (respect min 3s for UX)
   useEffect(() => {
     if (!has || paused || !!viewer) return;
     const id = setInterval(
@@ -70,7 +70,7 @@ export default function NoticeCarousel({
     );
   }
 
-  // safe fallbacks
+  // safe fallbacks pulled from current
   const title = (current?.title ?? "Notice").toString();
   const body = current?.body ?? "";
   const src = current?.src ?? "";

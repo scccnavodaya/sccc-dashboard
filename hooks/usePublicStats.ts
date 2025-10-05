@@ -2,8 +2,7 @@
 "use client";
 
 import useSWR from "swr";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type StatsResponse = {
   studentsTotal: number;
@@ -46,25 +45,17 @@ type Options = {
   realtime?: boolean;
 };
 
-export function usePublicStats(ym: string, opts: Options = {}) {
-  const {
-    refreshInterval = 15_000,
-    realtime = true,
-  } = opts;
+export function usePublicStats(ym: string | null | undefined, opts: Options = {}) {
+  const { refreshInterval = 15_000, realtime = true } = opts;
 
   const key = ym ? `/api/public/stats?ym=${encodeURIComponent(ym)}` : null;
 
-  const {
-    data,
-    error,
-    isLoading,
-    mutate,
-  } = useSWR<StatsResponse>(key, fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<StatsResponse>(key, fetcher, {
     keepPreviousData: true,
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     focusThrottleInterval: 10_000,
-    refreshInterval, // paused below when tab hidden
+    refreshInterval,
     errorRetryCount: 2,
     errorRetryInterval: 5_000,
   });
@@ -75,9 +66,7 @@ export function usePublicStats(ym: string, opts: Options = {}) {
     let paused = false;
     const onVis = () => {
       if (document.hidden) {
-        if (!paused) {
-          paused = true;
-        }
+        paused = true;
       } else {
         if (paused) {
           paused = false;
@@ -89,42 +78,82 @@ export function usePublicStats(ym: string, opts: Options = {}) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refreshInterval, mutate]);
 
-  // Supabase realtime client created once
-  const supabase: SupabaseClient | null = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) {
-      console.warn("[usePublicStats] Missing NEXT_PUBLIC_SUPABASE_URL or KEY");
-      return null;
-    }
-    return createClient(url, key);
-  }, []);
+  /**
+   * Create Supabase client at runtime (browser only).
+   * We dynamically import `@supabase/supabase-js` inside a useEffect so Turbopack / Next
+   * does not include potentially server-only runtime code into server bundles.
+   */
+  const [supabase, setSupabase] = useState<any | null>(null);
 
-  // Subscribe to table changes for instant updates (if enabled)
-  const channelRef = useRef<ReturnType<NonNullable<typeof supabase>["channel"]> | null>(null);
+  useEffect(() => {
+    // only run in browser
+    if (typeof window === "undefined") return;
+
+    let mounted = true;
+    (async () => {
+      try {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (!url || !key) {
+          // Do not spam console; but warn once
+          console.warn("[usePublicStats] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
+          return;
+        }
+        // dynamic import ensures server build doesn't pull supabase internals
+        const mod = await import("@supabase/supabase-js");
+        const client = mod.createClient(url, key, {
+          realtime: { params: { apikey: key } }, // sensible default
+        });
+        if (mounted) setSupabase(client);
+      } catch (e) {
+        console.error("[usePublicStats] failed to init supabase client", e);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      // do not call supabase cleanup here because we only stored client reference
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
+
+  // Keep reference to channel so we can remove on cleanup
+  const channelRef = useRef<any | null>(null);
 
   useEffect(() => {
     if (!realtime || !ym || !supabase) return;
 
-    const ch = supabase
-      .channel(`public-stats-${ym}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "students" }, () => mutate())
-      .on("postgres_changes", { event: "*", schema: "public", table: "tests" }, () => mutate())
-      .on("postgres_changes", { event: "*", schema: "public", table: "marks" }, () => mutate())
-      .on("postgres_changes", { event: "*", schema: "public", table: "notices" }, () => mutate())
-      .subscribe();
+    try {
+      // create unique channel for the month
+      const ch = supabase
+        .channel(`public-stats-${ym}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "students" }, () => mutate())
+        .on("postgres_changes", { event: "*", schema: "public", table: "tests" }, () => mutate())
+        .on("postgres_changes", { event: "*", schema: "public", table: "marks" }, () => mutate())
+        .on("postgres_changes", { event: "*", schema: "public", table: "notices" }, () => mutate())
+        .subscribe();
 
-    channelRef.current = ch;
+      channelRef.current = ch;
+    } catch (e) {
+      // Supabase realtime may throw if not available; catch to avoid breaking UI
+      console.warn("[usePublicStats] realtime subscription failed", e);
+      channelRef.current = null;
+    }
+
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+      if (channelRef.current && supabase?.removeChannel) {
+        try {
+          supabase.removeChannel(channelRef.current);
+        } catch (e) {
+          // ignore errors during teardown
+        }
         channelRef.current = null;
       }
     };
   }, [ym, realtime, supabase, mutate]);
 
   return {
-    stats: data,
+    stats: data ?? undefined,
     isLoading,
     isError: Boolean(error),
     error: error as Error | undefined,

@@ -57,11 +57,11 @@ export default function LatestExamTicker({
 
   return (
     <div
-      className={`
-        relative w-full overflow-hidden rounded-md
-        border border-emerald-100 bg-emerald-50
-        ${className}
-      `}
+      className={[
+        "relative w-full overflow-hidden rounded-md",
+        "border border-emerald-100 bg-emerald-50",
+        className,
+      ].join(" ")}
       aria-label="Latest Exam Notice"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -69,11 +69,11 @@ export default function LatestExamTicker({
       onBlur={() => setPaused(false)}
     >
       <div
-        className="
-          flex items-center gap-2
-          px-2 sm:px-3 py-1
-          text-[11px] sm:text-xs font-medium text-emerald-800
-        "
+        className={[
+          "flex items-center gap-2",
+          "px-2 sm:px-3 py-1",
+          "text-[11px] sm:text-xs font-medium text-emerald-800",
+        ].join(" ")}
         style={{ lineHeight: "1.25rem", minHeight: "1.25rem" }}
       >
         {/* Fixed chip on the left so it doesn't scroll away */}
@@ -95,6 +95,7 @@ export default function LatestExamTicker({
             // pause via inline style to avoid className thrash
             style={{
               animationPlayState: paused ? "paused" : "running",
+              // allow user to override interval by inline style if needed later
             }}
             aria-live="polite"
           >

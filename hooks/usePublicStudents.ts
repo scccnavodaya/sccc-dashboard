@@ -2,6 +2,7 @@
 "use client";
 
 import useSWR from "swr";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type PublicStudent = {
   id: string;
@@ -30,7 +31,7 @@ async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
     throw new Error(msg);
   }
 
-  // tiny shape guard
+  // Ensure shape is an array
   if (!Array.isArray(data)) {
     console.error("[usePublicStudents] Invalid students payload:", data);
     throw new Error("Invalid students payload");
@@ -40,12 +41,14 @@ async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
 }
 
 /**
- * Optionally pass { q } to filter server-side (if your API supports it).
- * Example: usePublicStudents({ q: search })
+ * Fetch public student list (optionally filtered by query).
+ * Automatically revalidates and supports Supabase realtime.
  */
-export function usePublicStudents(opts?: { q?: string }) {
-  const key = opts?.q?.trim()
-    ? `/api/public/students?q=${encodeURIComponent(opts.q.trim())}`
+export function usePublicStudents(opts?: { q?: string; realtime?: boolean }) {
+  const { q, realtime = true } = opts ?? {};
+
+  const key = q?.trim()
+    ? `/api/public/students?q=${encodeURIComponent(q.trim())}`
     : "/api/public/students";
 
   const { data, error, isLoading, mutate } = useSWR<PublicStudent[]>(
@@ -60,6 +63,69 @@ export function usePublicStudents(opts?: { q?: string }) {
       errorRetryInterval: 5_000,
     }
   );
+
+  // Supabase client (browser-only dynamic import)
+  const [supabase, setSupabase] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let mounted = true;
+    (async () => {
+      try {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (!url || !key) {
+          console.warn("[usePublicStudents] Missing NEXT_PUBLIC_SUPABASE_URL or KEY");
+          return;
+        }
+        const mod = await import("@supabase/supabase-js");
+        const client = mod.createClient(url, key, {
+          realtime: { params: { apikey: key } },
+        });
+        if (mounted) setSupabase(client);
+      } catch (e) {
+        console.error("[usePublicStudents] failed to init supabase client", e);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Realtime channel subscription for "students" table
+  const channelRef = useRef<any | null>(null);
+
+  useEffect(() => {
+    if (!realtime || !supabase) return;
+
+    try {
+      const ch = supabase
+        .channel("public-students")
+        .on("postgres_changes", { event: "*", schema: "public", table: "students" }, () => {
+          console.log("[usePublicStudents] realtime change detected → refetching");
+          mutate();
+        })
+        .subscribe();
+
+      channelRef.current = ch;
+    } catch (e) {
+      console.warn("[usePublicStudents] realtime subscription failed:", e);
+      channelRef.current = null;
+    }
+
+    return () => {
+      if (channelRef.current && supabase?.removeChannel) {
+        try {
+          supabase.removeChannel(channelRef.current);
+        } catch {
+          /* ignore cleanup errors */
+        }
+        channelRef.current = null;
+      }
+    };
+  }, [realtime, supabase, mutate]);
 
   return {
     students: data ?? [],

@@ -17,10 +17,11 @@ import { LatestExamItem } from "@/components/LatestExamTicker";
 import { usePublicStats } from "@/hooks/usePublicStats";
 import { usePublicStudents } from "@/hooks/usePublicStudents";
 import { usePublicScores, PublicTest } from "@/hooks/usePublicScores";
-import { usePublicNotices } from "@/hooks/usePublicNotices";
+import { usePublicNotices, PublicNotice } from "@/hooks/usePublicNotices";
 
 type Section = "MAT" | "ENGLISH" | "MATHS";
 
+/** Helpers */
 function ymNowIST() {
   const now = new Date();
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -68,7 +69,7 @@ export default function HomePage() {
             data.map((d: any) => ({
               id: String(d.id),
               text: String(d.text),
-              startAt: d.start_at || new Date().toISOString(),
+              startAt: d.start_at || d.startAt || new Date().toISOString(),
             }))
           );
         }
@@ -83,7 +84,7 @@ export default function HomePage() {
             data.map((d: any) => ({
               id: String(d.id),
               text: String(d.text),
-              startAt: d.start_at || new Date().toISOString(),
+              startAt: d.start_at || d.startAt || new Date().toISOString(),
             }))
           );
         }
@@ -232,6 +233,99 @@ export default function HomePage() {
     [liveMarks]
   );
 
+  // Build rows for SectionGrid (selected test or latest per-subject)
+  const currentSectionRows = useMemo(() => {
+    // shape expected by SectionGrid: id, name, photo, and optionally mat/eng/maths fields
+    if (!sectionForDropdown) return [] as any[];
+
+    // helper to gather marks per student for the selected test (if any)
+    const rows = liveStudents.map((s) => {
+      // find a mark entry for this student in the selected test (if selected)
+      const markForSelected = selectedTestId
+        ? liveMarks.find((m) => m.test_id === selectedTestId && m.student_id === s.id)
+        : undefined;
+
+      const row: any = {
+        id: s.id,
+        name: s.name,
+        photo: s.photo ?? null,
+      };
+
+      // if selectedTestId present, only that field populated
+      if (selectedTestId) {
+        if (sectionForDropdown === "MAT") row.mat = markForSelected?.score ?? null;
+        if (sectionForDropdown === "ENGLISH") row.eng = markForSelected?.score ?? null;
+        if (sectionForDropdown === "MATHS") row.maths = markForSelected?.score ?? null;
+      } else {
+        // if no selected test, show student's latest available value for that section (if any)
+        const lastForStudent = [...liveMarks]
+          .reverse()
+          .find((m) => m.student_id === s.id && m.score != null && subjectTestIds.has(m.test_id));
+        const val = lastForStudent ? lastForStudent.score : null;
+        if (sectionForDropdown === "MAT") row.mat = val;
+        if (sectionForDropdown === "ENGLISH") row.eng = val;
+        if (sectionForDropdown === "MATHS") row.maths = val;
+      }
+      return row;
+    });
+
+    return rows;
+  }, [liveStudents, liveMarks, sectionForDropdown, selectedTestId, subjectTestIds]);
+
+  // Full marks helper: attempt to derive full marks from test object, fallback to 50
+  function fullMarksForTest(t: any): number | null {
+    if (!t) return null;
+    const fmCandidates = [
+      t?.max_marks,
+      t?.maxMarks,
+      t?.max_score,
+      t?.full_marks,
+      t?.fullMarks,
+      t?.total_marks,
+    ];
+    for (const c of fmCandidates) {
+      const n = Number(c);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const tq = Number(
+      t?.total_questions ??
+        t?.questions ??
+        t?.totalQuestions ??
+        t?.question_count ??
+        t?.total_q
+    );
+    let mpq = Number(t?.marks_per_question ?? t?.mark_per_question ?? t?.mpq);
+    if (Number.isFinite(tq) && tq > 0) {
+      if (!Number.isFinite(mpq) || mpq <= 0) mpq = 1.25;
+      return tq * mpq;
+    }
+    return null;
+  }
+
+  const maxScoreForGrid = useMemo(() => {
+    if (!sectionForDropdown) return 50;
+    if (!selectedTestId) return 50;
+    const t = liveTests.find((x) => x.id === selectedTestId);
+    const fm = t ? fullMarksForTest(t) : null;
+    return fm ?? 50;
+  }, [sectionForDropdown, selectedTestId, liveTests]);
+
+  // Ensure NoticeCarousel receives properly typed items (NoticeItem)
+  const noticesForCarousel = useMemo(() => {
+    if (!Array.isArray(liveNotices)) return [];
+    return liveNotices.map((n: PublicNotice) => ({
+      id: String(n.id),
+      type: (n.type === "video" ? "video" : "image") as "image" | "video",
+      // title fallback order: n.title -> n.body -> "Notice"
+      title: (n.title ?? (n as any).body ?? "Notice") as string,
+      body: (n as any).body ?? undefined,
+      src: (n as any).src ?? undefined,
+      poster: (n as any).poster ?? null,
+      // accept either `startAt` or `start_at`
+      startAt: (n as any).startAt ?? (n as any).start_at ?? undefined,
+    }));
+  }, [liveNotices]);
+
   const CARD_CLASS =
     "rounded-2xl border bg-white p-3 flex flex-col min-w-0 " + activeTheme.border;
 
@@ -252,7 +346,7 @@ export default function HomePage() {
         }}
       />
 
-      {/* ✅ Spacer for fixed header; dynamic height */}
+      {/* Spacer for fixed header; dynamic height */}
       <div style={{ height: "var(--header-h,96px)" }} />
 
       <div className="mobile-rescue">
@@ -324,9 +418,9 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* ✅ GRID: Notice below on mobile, side-by-side on md+ */}
+              {/* GRID: Notice below on mobile, side-by-side on md+ */}
               <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 items-stretch min-w-0">
-                {/* LEFT: Leaderboard/Section table */}
+                {/* LEFT: Leaderboard / Section */}
                 <motion.div
                   key={`left-${section}-${dateOpt}-${month}`}
                   initial={{ opacity: 0, y: 8 }}
@@ -388,9 +482,9 @@ export default function HomePage() {
                         <div className="min-h-0 flex-1 overflow-x-auto text-xs sm:text-sm pr-1">
                           <SectionGrid
                             section={(sectionForDropdown || "MAT") as SectionKey}
-                            students={[]} // we'll fix rows in next step
+                            students={currentSectionRows}
                             fixedBodyHeightClass="h-full"
-                            maxScore={50} // placeholder for now
+                            maxScore={maxScoreForGrid}
                           />
                         </div>
                       </motion.div>
@@ -410,9 +504,12 @@ export default function HomePage() {
                     <h3 className="text-sm sm:text-base font-semibold truncate">
                       Notice Board
                     </h3>
+                    <span className={`text-[11px] ${activeTheme.text} shrink-0`}>
+                      Auto-scrolling
+                    </span>
                   </div>
                   <div className="min-h-[180px] md:min-h-[220px] flex-1 overflow-hidden">
-                    <NoticeCarousel items={liveNotices} barClassName={activeTheme.bar} />
+                    <NoticeCarousel items={noticesForCarousel} barClassName={activeTheme.bar} />
                   </div>
                 </motion.div>
               </div>
