@@ -1,64 +1,46 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export async function PATCH(_req: Request, { params }: { params: { id: string } }) {
-  const id = params.id;
+const TABLE = "exam_notices";
+
+// ✅ PATCH — update a specific notice
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
-    const body = await _req.json().catch(() => ({}));
-    const updates: any = {};
+    const id = params.id;
+    const body = await req.json();
 
-    if (typeof body.text === "string") {
-      const text = body.text.trim();
-      if (!text) return NextResponse.json({ error: "Text cannot be empty" }, { status: 400 });
-      updates.text = text;
-    }
+    const fields: Record<string, any> = {};
+    if (typeof body.text === "string") fields.text = body.text.trim();
+    if (typeof body.is_active === "boolean") fields.is_active = body.is_active;
 
-    if (typeof body.active === "boolean") {
-      const makeActive = body.active === true;
-
-      if (makeActive) {
-        // set all others inactive
-        const { error: deactErr } = await supabaseAdmin
-          .from("exam_ticker")
-          .update({ active: false, end_at: new Date().toISOString() })
-          .eq("active", true)
-          .neq("id", id);
-        if (deactErr) throw deactErr;
-
-        updates.active = true;
-        updates.end_at = null; // live
-        // keep start_at if already present
-      } else {
-        updates.active = false;
-        updates.end_at = new Date().toISOString();
-      }
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    // If setting one active → deactivate others
+    if (fields.is_active === true) {
+      await supabaseAdmin.from(TABLE).update({ is_active: false }).eq("is_active", true);
     }
 
     const { data, error } = await supabaseAdmin
-      .from("exam_ticker")
-      .update(updates)
+      .from(TABLE)
+      .update(fields)
       .eq("id", id)
       .select("*")
       .single();
+
     if (error) throw error;
 
     return NextResponse.json(data);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to update" }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const id = params.id;
+// ✅ DELETE — remove a notice
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
-    const { error } = await supabaseAdmin.from("exam_ticker").delete().eq("id", id);
+    const id = params.id;
+    const { error } = await supabaseAdmin.from(TABLE).delete().eq("id", id);
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to delete" }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

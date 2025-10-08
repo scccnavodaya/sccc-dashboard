@@ -1,57 +1,47 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-type ExamNotice = {
-  id: string;
-  text: string;
-  active: boolean;
-  start_at: string;
-  end_at: string | null;
-};
+const TABLE = "exam_notices";
 
+// ✅ GET all exam notices (latest first)
 export async function GET() {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("exam_ticker")
-      .select("*")
-      .order("start_at", { ascending: false });
-    if (error) throw error;
-    return NextResponse.json(data as ExamNotice[]);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to load" }, { status: 500 });
-  }
+  const { data, error } = await supabaseAdmin
+    .from(TABLE)
+    .select("*")
+    .order("start_at", { ascending: false });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data ?? []);
 }
 
-/**
- * Create AND make it the active notice.
- * Server-side guarantees only one 'active' at a time.
- * Body: { text: string }
- */
+// ✅ POST (publish new notice)
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const text = String(body?.text ?? "").trim();
-    if (!text) {
-      return NextResponse.json({ error: "Text is required" }, { status: 400 });
-    }
+    const body = await req.json();
+    const text = body?.text?.trim?.();
+    if (!text) return NextResponse.json({ error: "Missing text" }, { status: 400 });
 
-    // 1) deactivate any current active
-    const { error: deactErr } = await supabaseAdmin
-      .from("exam_ticker")
-      .update({ active: false, end_at: new Date().toISOString() })
-      .eq("active", true);
-    if (deactErr) throw deactErr;
+    // 🔹 Set all others inactive before inserting new one
+    await supabaseAdmin.from(TABLE).update({ is_active: false }).eq("is_active", true);
 
-    // 2) insert new as active
     const { data, error } = await supabaseAdmin
-      .from("exam_ticker")
-      .insert({ text, active: true, start_at: new Date().toISOString(), end_at: null })
+      .from(TABLE)
+      .insert({
+        text,
+        is_active: true,
+        start_at: new Date().toISOString(),
+        release_at: new Date().toISOString(),
+      })
       .select("*")
       .single();
+
     if (error) throw error;
 
     return NextResponse.json(data);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to create" }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || "Failed to insert notice" },
+      { status: 500 }
+    );
   }
 }

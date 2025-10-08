@@ -1,3 +1,4 @@
+// app/admin/settings/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -102,32 +103,30 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-xl px-3 sm:px-4 py-4">
-      {/* Back to Dashboard */}
-      <div className="mb-3">
+    <div className="mx-auto w-full max-w-lg px-3 py-4">
+      {/* Compact header */}
+      <div className="mb-2 flex items-center justify-between gap-2">
         <Link
           href="/admin"
-          className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
+          className="inline-flex items-center gap-2 rounded border px-2 py-1 text-xs hover:bg-zinc-50"
         >
-          ← Back to Dashboard
+          ← Back
         </Link>
+        <h2 className="text-sm font-semibold">Change credentials</h2>
       </div>
 
-      <h2 className="text-lg sm:text-xl font-semibold">Change credentials</h2>
-      <p className="mt-1 text-sm text-zinc-500">
-        Update your admin username and/or password.{" "}
-        <b>Current password</b> is always required. Passwords must follow the
-        rule below.
+      <p className="mb-3 text-xs text-zinc-500">
+        Update admin username and/or password. <b>Current password</b> required.
       </p>
 
-      <form onSubmit={submit} className="mt-4 space-y-4">
+      <form onSubmit={submit} className="space-y-3">
         {/* Username */}
         <div>
-          <label className="text-sm text-zinc-600">New username</label>
+          <label className="text-xs text-zinc-600">New username</label>
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
+            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-300"
             placeholder={
               currentUsername
                 ? `Current: ${currentUsername}`
@@ -139,13 +138,13 @@ export default function SettingsPage() {
 
         {/* Current password */}
         <div>
-          <label className="text-sm text-zinc-600">Current password</label>
+          <label className="text-xs text-zinc-600">Current password</label>
           <div className="mt-1 flex items-stretch">
             <input
               type={showCurrent ? "text" : "password"}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
+              className="w-full rounded-l-md border border-zinc-300 bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-300"
               placeholder="Enter current password"
               autoComplete="current-password"
               required
@@ -153,23 +152,23 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setShowCurrent((s) => !s)}
-              className="rounded-r-md border border-l-0 border-zinc-300 bg-zinc-50 px-3 text-zinc-600 hover:bg-zinc-100"
+              className="rounded-r-md border border-l-0 border-zinc-300 bg-zinc-50 px-2 text-zinc-600 hover:bg-zinc-100"
               aria-label={showCurrent ? "Hide password" : "Show password"}
             >
-              {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
         </div>
 
         {/* New password */}
         <div>
-          <label className="text-sm text-zinc-600">New password</label>
+          <label className="text-xs text-zinc-600">New password</label>
           <div className="mt-1 flex items-stretch">
             <input
               type={showNew ? "text" : "password"}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
+              className="w-full rounded-l-md border border-zinc-300 bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-300"
               placeholder="Enter new password"
               autoComplete="new-password"
               pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,64}"
@@ -178,10 +177,10 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setShowNew((s) => !s)}
-              className="rounded-r-md border border-l-0 border-zinc-300 bg-zinc-50 px-3 text-zinc-600 hover:bg-zinc-100"
+              className="rounded-r-md border border-l-0 border-zinc-300 bg-zinc-50 px-2 text-zinc-600 hover:bg-zinc-100"
               aria-label={showNew ? "Hide password" : "Show password"}
             >
-              {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
 
@@ -208,23 +207,21 @@ export default function SettingsPage() {
           )}
 
           {/* Rules helper */}
-          <ul className="mt-2 list-disc pl-5 text-xs text-zinc-500 space-y-0.5">
+          <ul className="mt-2 list-disc pl-4 text-xs text-zinc-500 space-y-0.5">
             <li>8–64 characters</li>
-            <li>At least 1 uppercase, 1 lowercase, 1 number, 1 special character</li>
+            <li>At least 1 uppercase, 1 lowercase, 1 number, 1 special</li>
           </ul>
 
           {/* Confirm (only when changing password) */}
           {newPassword && (
-            <div className="mt-3">
-              <label className="text-sm text-zinc-600">
-                Confirm new password
-              </label>
+            <div className="mt-2">
+              <label className="text-xs text-zinc-600">Confirm new password</label>
               <div className="mt-1 flex items-stretch">
                 <input
                   type={showConfirm ? "text" : "password"}
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full rounded-l-md border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
+                  className="w-full rounded-l-md border border-zinc-300 bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-300"
                   placeholder="Re-enter new password"
                   autoComplete="new-password"
                   required
@@ -232,10 +229,10 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirm((s) => !s)}
-                  className="rounded-r-md border border-l-0 border-zinc-300 bg-zinc-50 px-3 text-zinc-600 hover:bg-zinc-100"
+                  className="rounded-r-md border border-l-0 border-zinc-300 bg-zinc-50 px-2 text-zinc-600 hover:bg-zinc-100"
                   aria-label={showConfirm ? "Hide password" : "Show password"}
                 >
-                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
@@ -243,23 +240,23 @@ export default function SettingsPage() {
         </div>
 
         {err && (
-          <p className="text-sm text-red-600" aria-live="polite">
+          <p className="text-xs text-red-600" aria-live="polite">
             {err}
           </p>
         )}
         {msg && (
-          <p className="text-sm text-emerald-700" aria-live="polite">
+          <p className="text-xs text-emerald-700" aria-live="polite">
             {msg}
           </p>
         )}
 
-        <div className="pt-2">
+        <div className="pt-1">
           <button
             type="submit"
             disabled={loading || !canSubmit}
-            className="h-10 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+            className="h-9 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
           >
-            {loading ? "Saving..." : "Save changes"}
+            {loading ? "Saving..." : "Save"}
           </button>
         </div>
       </form>

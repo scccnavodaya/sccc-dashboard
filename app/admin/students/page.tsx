@@ -3,8 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, RotateCcw, Plus, Pencil, Check, X, Trash2, ImageIcon,
-  Filter, Search,
+  ArrowLeft,
+  RotateCcw,
+  Plus,
+  Pencil,
+  Check,
+  X,
+  Trash2,
+  ImageIcon,
+  Filter,
+  Search,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -179,7 +187,8 @@ function DpModal({ src, alt, onClose }: { src: string; alt: string; onClose: () 
   );
 }
 
-/* ========================= Simple square Cropper ========================= */
+/* ========================= Simple square Cropper + PhotoUploader ========================= */
+/* (kept unchanged — same UX & APIs) */
 
 function dataUrlFromFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -229,7 +238,9 @@ function CropModal({
   const dragging = useRef(false);
   const last = useRef({ x: 0, y: 0 });
 
-  useEffect(() => { dataUrlFromFile(file).then(setSrc); }, [file]);
+  useEffect(() => {
+    dataUrlFromFile(file).then(setSrc);
+  }, [file]);
 
   function onDown(e: React.MouseEvent | React.TouchEvent) {
     dragging.current = true;
@@ -245,7 +256,9 @@ function CropModal({
     }));
     last.current = { x: p.clientX, y: p.clientY };
   }
-  function onUp() { dragging.current = false; }
+  function onUp() {
+    dragging.current = false;
+  }
 
   async function confirm() {
     if (!imgEl) return;
@@ -278,8 +291,12 @@ function CropModal({
 
           <div
             className="relative mx-auto mt-3 h-[300px] w-[300px] overflow-hidden rounded-xl bg-zinc-100"
-            onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp}
-            onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+            onMouseDown={onDown}
+            onMouseMove={onMove}
+            onMouseUp={onUp}
+            onTouchStart={onDown}
+            onTouchMove={onMove}
+            onTouchEnd={onUp}
           >
             {src && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -304,7 +321,10 @@ function CropModal({
           <div className="mt-3 flex items-center gap-3">
             <span className="text-xs text-zinc-500">Zoom</span>
             <input
-              type="range" min={0.5} max={3} step={0.01}
+              type="range"
+              min={0.5}
+              max={3}
+              step={0.01}
               value={scale}
               onChange={(e) => setScale(parseFloat(e.target.value))}
               className="w-full accent-emerald-600"
@@ -325,12 +345,13 @@ function CropModal({
   );
 }
 
-/* ========================= PhotoUploader (unchanged logic) ========================= */
-
 function PhotoUploader({
   studentId,
   onDone,
-}: { studentId: string; onDone: (url: string) => void }) {
+}: {
+  studentId: string;
+  onDone: (url: string) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileToCrop, setFileToCrop] = useState<File | null>(null);
@@ -383,9 +404,9 @@ function PhotoUploader({
           onChange={onChange}
           disabled={busy}
         />
-        <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 transition hover:bg-emerald-50 disabled:opacity-60">
-          <ImageIcon size={14} />
-          {busy ? "Uploading…" : "Change photo"}
+        <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 transition hover:bg-emerald-50 disabled:opacity-60 text-xs">
+          <ImageIcon size={12} />
+          {busy ? "Uploading…" : "Change"}
         </span>
       </label>
 
@@ -406,7 +427,7 @@ function PhotoUploader({
   );
 }
 
-/* ========================= Main page ========================= */
+/* ========================= Main page (single-pane mode) ========================= */
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -417,7 +438,7 @@ export default function StudentsPage() {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // filters
+  // filters/search (used in list mode)
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
 
@@ -435,6 +456,10 @@ export default function StudentsPage() {
   const total = students.length;
   const activeCount = students.filter((s) => s.active).length;
 
+  // Page "mode" controls which full-card pane is visible.
+  // "add" = default; "list" = show full student list (recent/list view).
+  const [mode, setMode] = useState<"add" | "list">("add");
+
   async function load() {
     setLoading(true);
     try {
@@ -449,6 +474,10 @@ export default function StudentsPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    load();
+  }, []);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -506,7 +535,9 @@ export default function StudentsPage() {
     }
   }
 
-  function askDelete(s: Student) { setToDelete(s); }
+  function askDelete(s: Student) {
+    setToDelete(s);
+  }
 
   async function reallyDelete() {
     if (!toDelete) return;
@@ -537,8 +568,7 @@ export default function StudentsPage() {
   const filtered = useMemo(() => {
     const text = q.trim().toLowerCase();
     const matchQ = (s: Student) => !text || s.name.toLowerCase().includes(text);
-    const matchStatus = (s: Student) =>
-      status === "all" || (status === "active" ? s.active : !s.active);
+    const matchStatus = (s: Student) => status === "all" || (status === "active" ? s.active : !s.active);
 
     const ordered = [...students].sort((a, b) => {
       const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -549,10 +579,14 @@ export default function StudentsPage() {
     return ordered.filter((s) => matchQ(s) && matchStatus(s));
   }, [students, q, status]);
 
-  useEffect(() => { load(); }, []);
-
-  function beginEdit(s: Student) { setEditingId(s.id); setEditingName(s.name); }
-  function cancelEdit() { setEditingId(null); setEditingName(""); }
+  function beginEdit(s: Student) {
+    setEditingId(s.id);
+    setEditingName(s.name);
+  }
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingName("");
+  }
   async function commitEdit(s: Student) {
     const v = editingName.trim();
     setEditingId(null);
@@ -560,247 +594,291 @@ export default function StudentsPage() {
     await rename(s.id, v);
   }
 
-  // === fixed window ===
-  const LIST_BODY_4ROWS = "h-[224px]";
+  // constants reused from your previous layout for nicer compact table
   const ROW_HEIGHT_CLASS = "h-14";
+  const LIST_BODY_SCROLL = "max-h-[60vh] md:h-[224px] overflow-y-auto";
 
   const rowVariants = {
     hidden: { opacity: 0, y: 6 },
-    show:   { opacity: 1, y: 0, transition: { duration: 0.18 } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.18 } },
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-3 md:py-4">
-      {/* Top bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-4">
+      {/* Top bar inside the card */}
+      <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Link
             href="/admin"
-            className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm hover:bg-zinc-50"
           >
-            <ArrowLeft size={16} /> Back to Dashboard
+            <ArrowLeft size={14} /> {/* smaller */}
+            <span className="sr-only">Back</span>
           </Link>
-          <h2 className="text-lg sm:text-xl font-semibold">Students</h2>
+          <h2 className="text-lg font-semibold">Students</h2>
         </div>
+
         <div className="flex items-center gap-2">
           <Chip active>{activeCount} active</Chip>
           <Chip>{total} total</Chip>
+
+          <button
+            onClick={() => setMode((m) => (m === "list" ? "add" : "list"))}
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm hover:bg-zinc-50"
+            aria-pressed={mode === "list"}
+            title={mode === "list" ? "Show add form" : "Show recent / list"}
+          >
+            {mode === "list" ? <ArrowLeft size={14} /> : <RotateCcw size={14} />}{" "}
+            <span className="ml-1 text-xs">{mode === "list" ? "Back" : "Recent"}</span>
+          </button>
+
           <button
             onClick={load}
-            className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm hover:bg-zinc-50"
+            title="Refresh"
           >
-            <RotateCcw size={16} /> Refresh
+            <RotateCcw size={14} /> {/* smaller */}
           </button>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-zinc-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search students…"
-            className="w-[65vw] max-w-xs sm:max-w-none sm:w-64 md:w-72 rounded-md border border-zinc-300 py-1.5 pl-7 pr-2 text-sm outline-none transition focus:ring-2 focus:ring-emerald-300"
-            aria-label="Search students"
-          />
-        </div>
-        <div className="inline-flex items-center gap-1">
-          <Filter size={14} className="text-zinc-500" />
-          {(["all","active","inactive"] as const).map(k => (
-            <motion.button
-              key={k}
-              onClick={() => setStatus(k)}
-              whileTap={{ scale: 0.98 }}
-              className={`rounded-full px-3 py-1 text-sm transition ${
-                status === k ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-              }`}
-              aria-pressed={status === k}
+      {/* Animate between panes: Add (default) and List (recent) */}
+      <div className="rounded-2xl border bg-white p-4 shadow-sm">
+        <AnimatePresence mode="wait">
+          {mode === "add" ? (
+            <motion.div
+              key="add-pane"
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.18 }}
             >
-              {k[0].toUpperCase()+k.slice(1)}
-            </motion.button>
-          ))}
-        </div>
-      </div>
+              {/* Add student pane (full card width) */}
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <Plus size={14} />
+                </div>
+                <div className="text-base font-medium">Add student</div>
+              </div>
 
-      {/* Two-pane */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* LEFT: Add student */}
-        <motion.div
-          className="rounded-2xl border bg-white p-4"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="mb-2 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <Plus size={18} />
-            </div>
-            <div className="text-base font-medium">Add student</div>
-          </div>
-          <form onSubmit={add} className="mt-2">
-            <label className="text-xs text-zinc-600">Name</label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Student name"
-              className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 outline-none transition focus:ring-2 focus:ring-emerald-300"
-              required
-            />
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs text-zinc-500">Press Enter to save</span>
-              <button
-                type="submit"
-                disabled={saving || !name.trim()}
-                className="h-9 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60"
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-            </div>
-          </form>
-        </motion.div>
+              <form onSubmit={add} className="mt-2">
+                <label className="text-xs text-zinc-600">Name</label>
+                <input
+                  autoFocus
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Student name"
+                  className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 outline-none transition focus:ring-2 focus:ring-emerald-300"
+                  required
+                />
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-zinc-500">Press Enter to save</span>
+                  <button
+                    type="submit"
+                    disabled={saving || !name.trim()}
+                    className="h-9 rounded-md bg-emerald-600 px-4 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60"
+                  >
+                    {saving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </form>
 
-        {/* RIGHT: list */}
-        <motion.div
-          className="rounded-2xl border bg-white"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, delay: 0.05 }}
-        >
-          {/* Horizontal scroll on small screens only */}
-          <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
-            {/* keep a sane min width so columns don't squish on mobile */}
-            <div className="min-w-[920px]">
-              <div className="sticky top-0 z-10 border-b bg-zinc-50/80 px-3 py-2 backdrop-blur">
-                <div className="grid grid-cols-[56px_64px_minmax(220px,1fr)_120px_140px_180px] items-center gap-2 text-xs font-medium text-zinc-600">
-                  <div>#</div>
-                  <div>Photo</div>
-                  <div>Name</div>
-                  <div>Status</div>
-                  <div>Created</div>
-                  <div className="text-right">Actions</div>
+              {/* Quick hint + small controls (keeps consistent with original) */}
+              <div className="mt-4 border-t pt-3 text-sm text-zinc-500">
+                <div className="flex items-center gap-3">
+                  <Search className="text-zinc-400" size={12} />
+                  <div>Use the Recent button to view the full student list.</div>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="list-pane"
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.18 }}
+            >
+              {/* LIST / RECENT pane — full card width */}
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium">All students</div>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-zinc-400" size={12} />
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Search students…"
+                      className="w-56 rounded-md border border-zinc-300 py-1.5 pl-7 pr-2 text-sm outline-none transition focus:ring-2 focus:ring-emerald-300"
+                      aria-label="Search students"
+                    />
+                  </div>
+
+                  <div className="inline-flex items-center gap-1">
+                    <Filter size={12} className="text-zinc-500" />
+                    {(["all", "active", "inactive"] as const).map((k) => (
+                      <motion.button
+                        key={k}
+                        onClick={() => setStatus(k)}
+                        whileTap={{ scale: 0.98 }}
+                        className={`rounded-full px-3 py-1 text-sm transition ${
+                          status === k
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                        }`}
+                        aria-pressed={status === k}
+                      >
+                        {k[0].toUpperCase() + k.slice(1)}
+                      </motion.button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Fixed 4-row window with vertical scroll */}
-              <div
-                className={`${LIST_BODY_4ROWS} overflow-y-auto overscroll-contain touch-pan-y`}
-                aria-label="Students list"
-              >
-                {loading ? (
-                  <div className="p-3">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`grid ${ROW_HEIGHT_CLASS} grid-cols-[56px_64px_minmax(220px,1fr)_120px_140px_180px] items-center gap-2 border-b px-3`}
-                      >
-                        <div className="h-3 w-6 animate-pulse rounded bg-zinc-200" />
-                        <div className="h-10 w-10 animate-pulse rounded-full bg-zinc-200" />
-                        <div className="h-3 w-40 animate-pulse rounded bg-zinc-200" />
-                        <div className="h-6 w-20 animate-pulse rounded bg-zinc-200" />
-                        <div className="h-3 w-24 animate-pulse rounded bg-zinc-200" />
-                        <div className="ml-auto h-6 w-28 animate-pulse rounded bg-zinc-200" />
-                      </div>
-                    ))}
+              {/* Table / list area — adaptively scrollable */}
+              <div className={`rounded border ${LIST_BODY_SCROLL} overflow-x-auto`}>
+                <div className="min-w-[640px]">
+                  <div className="sticky top-0 z-10 border-b bg-zinc-50/80 px-3 py-2 backdrop-blur">
+                    <div className="grid grid-cols-[56px_64px_minmax(220px,1fr)_120px_140px] items-center gap-2 text-xs font-medium text-zinc-600">
+                      <div>#</div>
+                      <div>Photo</div>
+                      <div>Name</div>
+                      <div>Status</div>
+                      <div>Created</div>
+                    </div>
                   </div>
-                ) : filtered.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-zinc-500">No students found.</div>
-                ) : (
-                  <AnimatePresence initial={false}>
-                    {filtered.map((s, idx) => (
-                      <motion.div
-                        key={s.id}
-                        className={`grid ${ROW_HEIGHT_CLASS} grid-cols-[56px_64px_minmax(220px,1fr)_120px_140px_180px] items-center gap-2 border-b px-3 transition-colors hover:bg-zinc-50`}
-                        variants={rowVariants}
-                        initial="hidden"
-                        animate="show"
-                        exit={{ opacity: 0, y: -6 }}
-                        layout
-                      >
-                        <div className="text-sm text-zinc-600">{idx + 1}</div>
 
-                        {/* avatar → open DP modal */}
-                        <button
-                          className="h-10 w-10 overflow-hidden rounded-full border transition hover:ring-2 hover:ring-emerald-200"
-                          onClick={() => setDp({ src: buildPhotoUrl(s), alt: s.name })}
-                          title="View photo"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={buildPhotoUrl(s)} alt={s.name} className="h-full w-full object-cover" />
-                        </button>
+                  <div>
+                    {loading ? (
+                      <div className="p-3">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`grid ${ROW_HEIGHT_CLASS} grid-cols-[56px_64px_minmax(220px,1fr)_120px_140px] items-center gap-2 border-b px-3`}
+                          >
+                            <div className="h-3 w-6 animate-pulse rounded bg-zinc-200" />
+                            <div className="h-10 w-10 animate-pulse rounded-full bg-zinc-200" />
+                            <div className="h-3 w-40 animate-pulse rounded bg-zinc-200" />
+                            <div className="h-6 w-20 animate-pulse rounded bg-zinc-200" />
+                            <div className="h-3 w-24 animate-pulse rounded bg-zinc-200" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : filtered.length === 0 ? (
+                      <div className="p-6 text-center text-sm text-zinc-500">No students found.</div>
+                    ) : (
+                      <AnimatePresence initial={false}>
+                        {filtered.map((s, idx) => (
+                          <motion.div
+                            key={s.id}
+                            className={`grid ${ROW_HEIGHT_CLASS} grid-cols-[56px_64px_minmax(220px,1fr)_120px_140px] items-center gap-2 border-b px-3 transition-colors hover:bg-zinc-50`}
+                            variants={rowVariants}
+                            initial="hidden"
+                            animate="show"
+                            exit={{ opacity: 0, y: -6 }}
+                            layout
+                          >
+                            <div className="text-sm text-zinc-600">{idx + 1}</div>
 
-                        {/* Name (inline edit) */}
-                        <div className="min-w-0">
-                          {editingId === s.id ? (
-                            <div className="flex items-center gap-1">
-                              <input
-                                autoFocus
-                                value={editingName}
-                                onChange={(e) => setEditingName(e.target.value)}
-                                onBlur={() => commitEdit(s)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") commitEdit(s);
-                                  if (e.key === "Escape") cancelEdit();
-                                }}
-                                className="w-full rounded border border-zinc-300 px-2 py-1 text-sm outline-none transition focus:ring-2 focus:ring-emerald-300"
-                              />
-                              <button onClick={() => commitEdit(s)} className="rounded p-1 text-emerald-700 transition hover:bg-emerald-50" title="Save">
-                                <Check size={14} />
-                              </button>
-                              <button onClick={cancelEdit} className="rounded p-1 text-zinc-600 transition hover:bg-zinc-100" title="Cancel">
-                                <X size={14} />
-                              </button>
+                            {/* avatar → open DP modal */}
+                            <button
+                              className="h-10 w-10 overflow-hidden rounded-full border transition hover:ring-2 hover:ring-emerald-200"
+                              onClick={() => setDp({ src: buildPhotoUrl(s), alt: s.name })}
+                              title="View photo"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={buildPhotoUrl(s)} alt={s.name} className="h-full w-full object-cover" />
+                            </button>
+
+                            {/* Name (inline edit) */}
+                            <div className="min-w-0">
+                              {editingId === s.id ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    autoFocus
+                                    value={editingName}
+                                    onChange={(e) => setEditingName(e.target.value)}
+                                    onBlur={() => commitEdit(s)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") commitEdit(s);
+                                      if (e.key === "Escape") cancelEdit();
+                                    }}
+                                    className="w-full rounded border border-zinc-300 px-2 py-1 text-sm outline-none transition focus:ring-2 focus:ring-emerald-300"
+                                  />
+                                  <button onClick={() => commitEdit(s)} className="rounded p-1 text-emerald-700 transition hover:bg-emerald-50" title="Save">
+                                    <Check size={12} />
+                                  </button>
+                                  <button onClick={cancelEdit} className="rounded p-1 text-zinc-600 transition hover:bg-zinc-100" title="Cancel">
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="truncate text-sm font-medium" title={s.name}>
+                                    {s.name}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      beginEdit(s);
+                                    }}
+                                    className="rounded p-1 text-zinc-600 transition hover:bg-zinc-100 active:scale-[0.98]"
+                                    title="Rename"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="truncate text-sm font-medium" title={s.name}>{s.name}</span>
+
+                            <div>
                               <button
-                                onClick={() => { beginEdit(s); }}
-                                className="rounded p-1 text-zinc-600 transition hover:bg-zinc-100 active:scale-[0.98]"
-                                title="Rename"
+                                onClick={() => toggleActive(s)}
+                                className={`rounded px-2 py-1 text-xs transition ${
+                                  s.active ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                                }`}
                               >
-                                <Pencil size={14} />
+                                {s.active ? "Active" : "Inactive"}
                               </button>
                             </div>
-                          )}
-                        </div>
 
-                        <div>
-                          <button
-                            onClick={() => toggleActive(s)}
-                            className={`rounded px-2 py-1 text-xs transition ${
-                              s.active ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                            }`}
-                          >
-                            {s.active ? "Active" : "Inactive"}
-                          </button>
-                        </div>
-
-                        <div className="text-sm text-zinc-600">
-                          {s.created_at ? new Date(s.created_at).toLocaleDateString() : "-"}
-                        </div>
-
-                        <div className="ml-auto flex items-center justify-end gap-2">
-                          <PhotoUploader studentId={s.id} onDone={(url) => applyNewPhoto(s.id, url)} />
-                          <button
-                            onClick={() => askDelete(s)}
-                            className="rounded border px-2 py-1 text-xs text-red-600 transition hover:bg-red-50 active:scale-[0.98]"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                )}
+                            <div className="text-sm text-zinc-600">
+                              {s.created_at ? new Date(s.created_at).toLocaleDateString() : "-"}
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    )}
+                  </div>
+                </div>
               </div>
-              {/* /fixed window */}
-            </div>
-          </div>
-        </motion.div>
+
+              {/* footer actions for list pane */}
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <div className="text-xs text-zinc-500">Showing {filtered.length} students</div>
+                <div className="flex items-center gap-2">
+                  <PhotoUploader studentId={filtered[0]?.id ?? ""} onDone={() => load()} />
+                  <button
+                    onClick={() => {
+                      setMode("add");
+                      // small UX: scroll to top of the card when returning to add
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm hover:bg-zinc-50"
+                  >
+                    <Plus size={12} /> <span className="text-xs">Add</span>
+                  </button>
+                  <button
+                    onClick={load}
+                    className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm hover:bg-zinc-50"
+                  >
+                    <RotateCcw size={12} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* modals */}

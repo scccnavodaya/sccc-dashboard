@@ -2,12 +2,16 @@
 "use client";
 
 import useSWR from "swr";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+// -----------------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------------
 export type PublicTest = {
   id: string;
-  section: "MAT" | "ENGLISH" | "MATHS";
-  test_date: string; // YYYY-MM-DD
+  section: "MAT" | "ENGLISH" | "MATHS" | string;
+  test_date: string; // normalized field name for consistency
+  testDate?: string; // optional camelCase alias for UI compatibility
   max_marks?: number | null;
   total_questions?: number | null;
 };
@@ -23,40 +27,103 @@ export type ScoresResponse = {
   marks: PublicMark[];
 };
 
-// SWR fetcher (supports AbortSignal)
-async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
+// -----------------------------------------------------------------------------
+// Normalization Helper
+// -----------------------------------------------------------------------------
+function normalizeScores(raw: unknown): ScoresResponse {
+  const base: any = Array.isArray(raw)
+    ? { tests: [], marks: raw }
+    : (raw as any)?.data || raw;
+
+  const tests: PublicTest[] = Array.isArray(base?.tests)
+    ? base.tests.map((t: any) => {
+        const testDateValue = String(t?.test_date ?? t?.testDate ?? t?.date ?? "");
+        return {
+          id: String(t?.id ?? t?.test_id ?? ""),
+          section: (t?.section ?? t?.subject ?? "MAT").toString().toUpperCase(),
+          test_date: testDateValue,
+          testDate: testDateValue, // ensure both are present
+          max_marks:
+            t?.max_marks != null
+              ? Number(t.max_marks)
+              : t?.total_marks != null
+              ? Number(t.total_marks)
+              : null,
+          total_questions:
+            t?.total_questions != null
+              ? Number(t.total_questions)
+              : t?.questions != null
+              ? Number(t.questions)
+              : null,
+        };
+      })
+    : [];
+
+  const marks: PublicMark[] = Array.isArray(base?.marks)
+    ? base.marks.map((m: any) => ({
+        test_id: String(m?.test_id ?? m?.test ?? ""),
+        student_id: String(m?.student_id ?? m?.student ?? ""),
+        score:
+          m?.score == null
+            ? null
+            : typeof m.score === "number"
+            ? m.score
+            : Number(m.score),
+      }))
+    : [];
+
+  // Defensive debug (safe if console isn't available)
+  try {
+    console.debug("[usePublicScores] normalized tests:", tests);
+    console.debug("[usePublicScores] normalized marks:", marks);
+  } catch {}
+
+  return { tests, marks };
+}
+
+// -----------------------------------------------------------------------------
+// SWR Fetcher (SWR v2-compatible)
+// Note: SWR passes the fetcher a single optional param object { signal }
+// -----------------------------------------------------------------------------
+async function swrFetcher(
+  key: string,
+  param?: { signal?: AbortSignal }
+): Promise<ScoresResponse> {
+  const signal = param?.signal;
+
   const res = await fetch(key, {
     credentials: "include",
     cache: "no-store",
     signal,
   });
 
+  // Parse JSON robustly for better errors and debugging
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch (err) {
+    console.error("[usePublicScores] parse error:", err);
+    throw new Error("Invalid JSON response from scores API");
+  }
+
   if (!res.ok) {
-    let msg = "Failed to load scores";
-    try {
-      const j = await res.json();
-      if (j?.error) msg = j.error;
-    } catch {
-      // ignore JSON errors
-    }
-    console.error("[usePublicScores] fetch failed:", res.status, msg);
+    const msg = data?.error || `Failed to load scores (status ${res.status})`;
+    console.error("[usePublicScores] fetch failed:", msg);
     throw new Error(msg);
   }
 
-  const data = await res.json();
-  if (
-    !data ||
-    typeof data !== "object" ||
-    !Array.isArray((data as any).tests) ||
-    !Array.isArray((data as any).marks)
-  ) {
-    console.error("[usePublicScores] Invalid scores payload:", data);
-    throw new Error("Invalid scores payload");
+  if (!data || typeof data !== "object") {
+    console.error("[usePublicScores] Invalid payload:", data);
+    // return empty shape rather than throwing so UI keeps stable
+    return { tests: [], marks: [] };
   }
 
-  return data as ScoresResponse;
+  return normalizeScores(data);
 }
 
+// -----------------------------------------------------------------------------
+// Hook: usePublicScores
+// -----------------------------------------------------------------------------
 type Options = {
   /** Auto-refresh interval in ms (default: disabled) */
   refreshInterval?: number;
@@ -68,21 +135,28 @@ export function usePublicScores(month: string, opts: Options = {}) {
   const { refreshInterval = 0, realtime = true } = opts;
   const key = month ? `/api/public/scores?ym=${encodeURIComponent(month)}` : null;
 
-  const { data, error, isLoading, mutate } = useSWR<ScoresResponse>(key, swrFetcher, {
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
-    focusThrottleInterval: 10_000,
-    keepPreviousData: true,
-    refreshInterval,
-    errorRetryCount: 2,
-    errorRetryInterval: 5_000,
-  });
+  const { data, error, isLoading, mutate } = useSWR<ScoresResponse>(
+    key,
+    swrFetcher,
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      focusThrottleInterval: 10_000,
+      keepPreviousData: true,
+      refreshInterval,
+      errorRetryCount: 2,
+      errorRetryInterval: 5_000,
+    }
+  );
 
-  // Lazy-load Supabase client (browser-only)
+  // ---------------------------------------------------------------------------
+  // Supabase Realtime Setup (browser-only)
+  // ---------------------------------------------------------------------------
   const [supabase, setSupabase] = useState<any | null>(null);
+  const channelRef = useRef<any | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !realtime) return;
 
     let mounted = true;
     (async () => {
@@ -90,47 +164,55 @@ export function usePublicScores(month: string, opts: Options = {}) {
         const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
         if (!url || !key) {
-          console.warn("[usePublicScores] Missing NEXT_PUBLIC_SUPABASE_URL or KEY");
+          console.warn("[usePublicScores] Missing Supabase env vars");
           return;
         }
-        const mod = await import("@supabase/supabase-js");
-        const client = mod.createClient(url, key, {
+        const { createClient } = await import("@supabase/supabase-js");
+        const client = createClient(url, key, {
           realtime: { params: { apikey: key } },
         });
         if (mounted) setSupabase(client);
       } catch (e) {
-        console.error("[usePublicScores] failed to init Supabase client", e);
+        console.error("[usePublicScores] supabase init error:", e);
       }
     })();
 
+    // cleanup must return void
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [realtime]);
 
-  // Subscribe to realtime updates (tests + marks tables)
-  const channelRef = useRef<any | null>(null);
-
+  // ---------------------------------------------------------------------------
+  // Realtime Subscriptions (tests & marks)
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!realtime || !month || !supabase) return;
 
     try {
       const ch = supabase
         .channel(`public-scores-${month}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "tests" }, () => {
-          console.log("[usePublicScores] tests changed → refetching");
-          mutate();
-        })
-        .on("postgres_changes", { event: "*", schema: "public", table: "marks" }, () => {
-          console.log("[usePublicScores] marks changed → refetching");
-          mutate();
-        })
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "tests" },
+          () => {
+            console.log("[usePublicScores] tests changed → refetching");
+            mutate();
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "marks" },
+          () => {
+            console.log("[usePublicScores] marks changed → refetching");
+            mutate();
+          }
+        )
         .subscribe();
 
       channelRef.current = ch;
     } catch (e) {
       console.warn("[usePublicScores] realtime subscription failed:", e);
-      channelRef.current = null;
     }
 
     return () => {
@@ -145,6 +227,9 @@ export function usePublicScores(month: string, opts: Options = {}) {
     };
   }, [realtime, month, supabase, mutate]);
 
+  // ---------------------------------------------------------------------------
+  // Return structured hook output
+  // ---------------------------------------------------------------------------
   return {
     tests: data?.tests ?? [],
     marks: data?.marks ?? [],

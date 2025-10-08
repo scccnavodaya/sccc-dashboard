@@ -71,11 +71,11 @@ function ymFromISO(isoDate: string) {
 }
 
 export default function AdminTestsPage() {
+  // form state (unchanged)
   const [section, setSection] = useState<SectionKey>("MAT");
   const [testDate, setTestDate] = useState<string>(() =>
     new Date().toISOString().slice(0, 10)
   );
-
   const [totalQStr, setTotalQStr] = useState<string>("0");
   const totalQ = useMemo(
     () => Math.max(0, parseInt((totalQStr || "0").trim(), 10) || 0),
@@ -88,6 +88,7 @@ export default function AdminTestsPage() {
 
   const [banner, setBanner] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
+  // recent state (unchanged)
   const [recent, setRecent] = useState<RecentTest[]>([]);
   const [recentFilter, setRecentFilter] = useState<SectionKey | "ALL">("ALL");
   const [recentMonth, setRecentMonth] = useState<string>(() => ymNowIST());
@@ -95,11 +96,14 @@ export default function AdminTestsPage() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<RecentTest | null>(null);
-  const [editDraft, setEditDraft] = useState<{ section: SectionKey; date: string; totalQStr: string; }>({
+  const [editDraft, setEditDraft] = useState<{ section: SectionKey; date: string; totalQStr: string; }>( {
     section: "MAT",
     date: "",
     totalQStr: "0",
   });
+
+  // UI: which vertical tab is active — "form" or "recent"
+  const [activeTab, setActiveTab] = useState<"form" | "recent">("form");
 
   const presentCount = useMemo(() => rows.filter((r) => r.present).length, [rows]);
   const maxMarks = useMemo(() => totalQ * 1.25, [totalQ]);
@@ -217,6 +221,8 @@ export default function AdminTestsPage() {
 
       setRows((list) => list.map((r) => ({ ...r, wrongStr: "0" })));
 
+      // switch to recent after save (user expectation)
+      setActiveTab("recent");
       setRecentFilter(section);
       setRecentMonth(ymFromISO(testDate));
 
@@ -298,411 +304,347 @@ export default function AdminTestsPage() {
   }
 
   // Responsive heights: generous on mobile, fixed on desktop
-  const fixedScrollCls =
-    "max-h-[60vh] md:h-[224px] overflow-y-auto";
+  const fixedScrollCls = "max-h-[60vh] md:h-[224px] overflow-y-auto";
 
   const rowVariants = {
     hidden: { opacity: 0, y: 4 },
     show: { opacity: 1, y: 0, transition: { duration: 0.18 } },
   };
 
+  // --- UI: vertical single-card layout with tab toggle ---
   return (
-    <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-2 md:py-4 safe-x">
-      {/* Top bar */}
-      <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin"
-            className="inline-flex items-center gap-1 rounded border px-2.5 py-1.5 sm:px-3 text-xs sm:text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
-          >
-            <ArrowLeft size={14} className="sm:h-4 sm:w-4" /> Back to Dashboard
-          </Link>
-          <h2 className="text-lg sm:text-xl font-semibold">Tests</h2>
-        </div>
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-zinc-600">
-          <ClipboardList size={14} className="sm:h-4 sm:w-4" />
-          <span>{presentCount} present</span>
-        </div>
-      </div>
-
-      {/* Inline banner */}
-      <AnimatePresence>
-        {banner && (
-          <motion.div
-            key={banner.msg}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            className={`mb-3 rounded-md px-3 py-2 text-xs sm:text-sm shadow-sm ${
-              banner.type === "success"
-                ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border border-red-200 bg-red-50 text-red-700"
-            }`}
-            aria-live="polite"
-          >
-            {banner.msg}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="grid grid-cols-1 gap-3 md:gap-4 md:grid-cols-2">
-        {/* LEFT: form */}
-        <motion.form
-          onSubmit={submit}
-          className="rounded-2xl border bg-white p-3 sm:p-4 shadow-sm"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {/* inputs */}
-          <div className="mb-3 grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-3">
-            {/* Section */}
-            <div>
-              <label className="text-[11px] sm:text-xs text-zinc-600">Section</label>
-              <select
-                value={section}
-                onChange={(e) => setSection(e.target.value as SectionKey)}
-                className="mt-1 w-full rounded border border-zinc-300 px-2.5 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
-                aria-label="Test section"
-              >
-                <option value="MAT">MAT</option>
-                <option value="ENGLISH">ENGLISH</option>
-                <option value="MATHS">MATHS</option>
-              </select>
-            </div>
-            {/* Date */}
-            <div>
-              <label className="text-[11px] sm:text-xs text-zinc-600">Test Date</label>
-              <div className="relative mt-1">
-                <input
-                  type="date"
-                  value={testDate}
-                  onChange={(e) => setTestDate(e.target.value)}
-                  className="w-full rounded border border-zinc-300 px-2.5 py-2 pr-8 text-sm transition focus:ring-2 focus:ring-emerald-300"
-                  aria-label="Test date"
-                />
-                <Calendar className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-zinc-400" />
-              </div>
-            </div>
-            {/* Total Questions */}
-            <div>
-              <label className="text-[11px] sm:text-xs text-zinc-600">Total Questions</label>
-              <input
-                inputMode="numeric"
-                value={totalQStr}
-                onChange={(e) => setTotalQStr(e.target.value.replace(/[^\d]/g, ""))}
-                onFocus={() => {
-                  if (totalQStr === "0") setTotalQStr("");
-                }}
-                className="mt-1 w-full rounded border border-zinc-300 px-2.5 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
-                placeholder="0"
-                aria-label="Total questions"
-              />
-            </div>
+    <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-4">
+      <div className="rounded-2xl border bg-white p-3 sm:p-4 shadow-sm">
+        {/* top bar: back + small title + quick stats */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
+              aria-label="Back to dashboard"
+            >
+              <ArrowLeft size={14} />
+            </Link>
+            <h2 className="text-lg font-semibold">Tests</h2>
           </div>
 
-          {/* header actions */}
-          <div className="mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="text-xs sm:text-sm font-medium">
-              Enter wrong counts (each Q = 1.25)
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-              <button
-                type="button"
-                onClick={() => markAllPresent(true)}
-                className="rounded border px-2.5 py-1 transition hover:bg-zinc-50 active:scale-[0.99]"
-              >
-                Mark all present
-              </button>
-              <button
-                type="button"
-                onClick={() => markAllPresent(false)}
-                className="rounded border px-2.5 py-1 transition hover:bg-zinc-50 active:scale-[0.99]"
-              >
-                Mark all absent
-              </button>
-            </div>
-          </div>
-
-          {/* Students grid */}
-          <div className={`${fixedScrollCls} rounded border overflow-x-auto`}>
-            <table className="w-full min-w-[560px] sm:min-w-0 text-xs sm:text-sm">
-              <thead className="sticky top-0 bg-zinc-50">
-                <tr className="text-left text-zinc-600">
-                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">#</th>
-                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Student</th>
-                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Present</th>
-                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Wrong</th>
-                  <th className="px-2.5 sm:px-3 py-2 text-right whitespace-nowrap">Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                <AnimatePresence initial={false}>
-                  {rows.map((r, i) => {
-                    const wrong = parseAndClampWrong(r.wrongStr);
-                    const score = r.present ? Math.max(0, (totalQ - wrong) * 1.25) : 0;
-                    const stu = students.find((s) => s.id === r.student_id);
-                    return (
-                      <motion.tr
-                        key={r.student_id}
-                        variants={rowVariants}
-                        initial="hidden"
-                        animate="show"
-                        exit={{ opacity: 0 }}
-                        className="border-t transition-colors hover:bg-zinc-50"
-                      >
-                        <td className="px-2.5 sm:px-3 py-2">{i + 1}</td>
-                        <td className="px-2.5 sm:px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={buildPhotoUrl(stu)}
-                              alt={r.name}
-                              className="h-7 w-7 sm:h-8 sm:w-8 rounded-full border object-cover"
-                            />
-                            <span className="font-medium truncate max-w-[160px] sm:max-w-none">
-                              {r.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-2.5 sm:px-3 py-2">
-                          <input
-                            type="checkbox"
-                            checked={r.present}
-                            onChange={() => togglePresent(r.student_id)}
-                            aria-label={`Present: ${r.name}`}
-                          />
-                        </td>
-                        <td className="px-2.5 sm:px-3 py-2">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            disabled={!r.present}
-                            value={r.wrongStr}
-                            onChange={(e) => setWrongStr(r.student_id, e.target.value)}
-                            className="w-16 sm:w-20 rounded border border-zinc-300 px-2 py-1 transition focus:ring-2 focus:ring-emerald-300 disabled:bg-zinc-50"
-                            placeholder="0"
-                            aria-label={`Wrong answers: ${r.name}`}
-                          />
-                        </td>
-                        <td className="px-2.5 sm:px-3 py-2 text-right font-semibold">
-                          {r.present ? `${fmt(score)}/${fmt(maxMarks)}` : "—"}
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </AnimatePresence>
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-zinc-500">
-                      No students
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* footer */}
-          <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-xs text-zinc-600">
+            <ClipboardList size={14} />
+            <span>{presentCount} present</span>
             <button
-              type="button"
               onClick={loadStudents}
-              className="inline-flex items-center gap-1 rounded border px-2.5 py-1.5 text-xs sm:text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
+              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition hover:bg-zinc-50"
+              title="Refresh students"
             >
-              <RotateCcw size={14} className="sm:h-4 sm:w-4" /> Refresh students
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !testDate || totalQ === 0}
-              className="inline-flex items-center gap-2 rounded bg-emerald-600 px-3 sm:px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60"
-            >
-              <CheckCircle2 size={16} className="sm:h-4 sm:w-4" />
-              {saving ? "Saving…" : "Save Test"}
+              <RotateCcw size={14} />
             </button>
           </div>
-        </motion.form>
+        </div>
 
-        {/* RIGHT: recent tests */}
-        <motion.div
-          className="rounded-2xl border bg-white p-3 sm:p-4 shadow-sm"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, delay: 0.05 }}
-        >
-          <div className="mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="text-sm sm:text-base font-medium">Recent Tests</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="month"
-                value={recentMonth}
-                onChange={(e) => setRecentMonth(e.target.value)}
-                className="rounded border border-zinc-300 px-2 py-1 text-xs sm:text-sm transition focus:ring-2 focus:ring-emerald-300"
-                aria-label="Filter by month"
-              />
-              <select
-                value={recentFilter}
-                onChange={(e) => setRecentFilter(e.target.value as SectionKey | "ALL")}
-                className="rounded border border-zinc-300 px-2 py-1 text-xs sm:text-sm transition focus:ring-2 focus:ring-emerald-300"
-                aria-label="Filter by section"
-              >
-                <option value="ALL">All sections</option>
-                <option value="MAT">MAT</option>
-                <option value="ENGLISH">ENGLISH</option>
-                <option value="MATHS">MATHS</option>
-              </select>
-            </div>
-          </div>
+        {/* Tabs toggle: New test | Recent */}
+        <div className="mb-3 flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("form")}
+            className={`rounded-full px-3 py-1 text-sm transition ${
+              activeTab === "form" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+            }`}
+            aria-pressed={activeTab === "form"}
+          >
+            New test
+          </button>
+          <button
+            onClick={() => setActiveTab("recent")}
+            className={`rounded-full px-3 py-1 text-sm transition ${
+              activeTab === "recent" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+            }`}
+            aria-pressed={activeTab === "recent"}
+          >
+            Recent
+          </button>
+        </div>
 
-          <div className={`${fixedScrollCls} rounded border overflow-x-auto`}>
-            <table className="w-full min-w-[520px] sm:min-w-0 text-xs sm:text-sm">
-              <thead className="sticky top-0 bg-zinc-50">
-                <tr className="text-left text-zinc-600">
-                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Date</th>
-                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Section</th>
-                  <th className="px-2.5 sm:px-3 py-2 whitespace-nowrap">Total Q</th>
-                  <th className="px-2.5 sm:px-3 py-2 text-right whitespace-nowrap">Entries</th>
-                  <th className="px-2.5 sm:px-3 py-2 text-right whitespace-nowrap">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingRecent ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="px-3 py-2">
-                        <div className="h-3 w-28 animate-pulse rounded bg-zinc-200" />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="h-3 w-20 animate-pulse rounded bg-zinc-200" />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="h-3 w-16 animate-pulse rounded bg-zinc-200" />
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <div className="ml-auto h-3 w-10 animate-pulse rounded bg-zinc-200" />
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <div className="ml-auto h-6 w-20 animate-pulse rounded bg-zinc-200" />
-                      </td>
-                    </tr>
-                  ))
-                ) : recent.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-zinc-500">
-                      No tests found
-                    </td>
-                  </tr>
-                ) : (
-                  recent.map((t) => (
-                    <tr key={t.id} className="border-t transition-colors hover:bg-zinc-50">
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        {new Date(t.test_date + "T00:00:00").toLocaleDateString("en-IN")}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">{t.section}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{t.total_questions ?? 0}</td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">{t.marks_count}</td>
-                      <td className="px-3 py-2 text-right">
-                        {confirmDeleteId === t.id ? (
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            <button
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] sm:text-xs transition hover:bg-zinc-50 active:scale-[0.99]"
-                            >
-                              <X size={12} className="sm:h-3.5 sm:w-3.5" /> No
-                            </button>
-                            <button
-                              onClick={() => doDelete(t.id)}
-                              className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-[11px] sm:text-xs text-red-700 transition hover:bg-red-100 active:scale-[0.99]"
-                            >
-                              <Trash2 size={12} className="sm:h-3.5 sm:w-3.5" /> Yes, delete
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            <button
-                              onClick={() => openEdit(t)}
-                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] sm:text-xs transition hover:bg-zinc-50 active:scale-[0.99]"
-                            >
-                              <Pencil size={12} className="sm:h-3.5 sm:w-3.5" /> Edit
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(t.id)}
-                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] sm:text-xs text-red-600 transition hover:bg-red-50 active:scale-[0.99]"
-                            >
-                              <Trash2 size={12} className="sm:h-3.5 sm:w-3.5" /> Delete
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+        {/* banner */}
+        <AnimatePresence>
+          {banner && (
+            <motion.div
+              key={banner.msg}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className={`mb-3 rounded-md px-3 py-2 text-xs shadow-sm ${
+                banner.type === "success"
+                  ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border border-red-200 bg-red-50 text-red-700"
+              }`}
+              aria-live="polite"
+            >
+              {banner.msg}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* Edit panel */}
-          <AnimatePresence>
-            {editing && (
-              <motion.div
-                className="mt-3 rounded-xl border bg-white p-3"
+        {/* Content area: show form or recent based on activeTab */}
+        <div>
+          {/* NEW TEST FORM */}
+          <AnimatePresence initial={false} mode="wait">
+            {activeTab === "form" && (
+              <motion.form
+                key="form"
+                onSubmit={submit}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="space-y-3"
               >
-                <div className="mb-2 text-sm font-semibold">Edit test</div>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                  <select
-                    value={editDraft.section}
-                    onChange={(e) =>
-                      setEditDraft((d) => ({ ...d, section: e.target.value as SectionKey }))
-                    }
-                    className="rounded border border-zinc-300 px-3 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
-                    aria-label="Edit section"
-                  >
-                    <option value="MAT">MAT</option>
-                    <option value="ENGLISH">ENGLISH</option>
-                    <option value="MATHS">MATHS</option>
-                  </select>
-                  <input
-                    type="date"
-                    value={editDraft.date}
-                    onChange={(e) => setEditDraft((d) => ({ ...d, date: e.target.value }))}
-                    className="rounded border border-zinc-300 px-3 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
-                    aria-label="Edit test date"
-                  />
-                  <input
-                    inputMode="numeric"
-                    value={editDraft.totalQStr}
-                    onChange={(e) =>
-                      setEditDraft((d) => ({
-                        ...d,
-                        totalQStr: e.target.value.replace(/[^\d]/g, ""),
-                      }))
-                    }
-                    className="rounded border border-zinc-300 px-3 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
-                    placeholder="0"
-                    aria-label="Edit total questions"
-                  />
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div>
+                    <label className="text-[11px] text-zinc-600">Section</label>
+                    <select
+                      value={section}
+                      onChange={(e) => setSection(e.target.value as SectionKey)}
+                      className="mt-1 w-full rounded border border-zinc-300 px-2.5 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                      aria-label="Test section"
+                    >
+                      <option value="MAT">MAT</option>
+                      <option value="ENGLISH">ENGLISH</option>
+                      <option value="MATHS">MATHS</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-zinc-600">Test Date</label>
+                    <div className="relative mt-1">
+                      <input
+                        type="date"
+                        value={testDate}
+                        onChange={(e) => setTestDate(e.target.value)}
+                        className="w-full rounded border border-zinc-300 px-2.5 py-2 pr-8 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                      />
+                      <Calendar className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-zinc-400" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-zinc-600">Total Questions</label>
+                    <input
+                      inputMode="numeric"
+                      value={totalQStr}
+                      onChange={(e) => setTotalQStr(e.target.value.replace(/[^\d]/g, ""))}
+                      onFocus={() => { if (totalQStr === "0") setTotalQStr(""); }}
+                      className="mt-1 w-full rounded border border-zinc-300 px-2.5 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                      placeholder="0"
+                    />
+                  </div>
                 </div>
-                <div className="mt-2 flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => setEditing(null)}
-                    className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm transition hover:bg-zinc-50 active:scale-[0.99]"
-                  >
-                    <X size={16} /> Cancel
-                  </button>
-                  <button
-                    onClick={saveEdit}
-                    className="inline-flex items-center gap-1 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-[0.99]"
-                  >
-                    <Save size={16} /> Save
-                  </button>
+
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-zinc-600">Enter wrong counts (each Q = 1.25)</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => markAllPresent(true)}
+                      className="rounded border px-2 py-1 text-xs"
+                    >
+                      Mark all present
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => markAllPresent(false)}
+                      className="rounded border px-2 py-1 text-xs"
+                    >
+                      Mark all absent
+                    </button>
+                  </div>
                 </div>
+
+                <div className={`${fixedScrollCls} rounded border overflow-x-auto`}>
+                  <table className="w-full min-w-[520px] text-xs sm:text-sm">
+                    <thead className="sticky top-0 bg-zinc-50">
+                      <tr className="text-left text-zinc-600">
+                        <th className="px-2 py-2 whitespace-nowrap">#</th>
+                        <th className="px-2 py-2 whitespace-nowrap">Student</th>
+                        <th className="px-2 py-2 whitespace-nowrap">Present</th>
+                        <th className="px-2 py-2 whitespace-nowrap">Wrong</th>
+                        <th className="px-2 py-2 text-right whitespace-nowrap">Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, i) => {
+                        const wrong = parseAndClampWrong(r.wrongStr);
+                        const score = r.present ? Math.max(0, (totalQ - wrong) * 1.25) : 0;
+                        const stu = students.find((s) => s.id === r.student_id);
+                        return (
+                          <tr key={r.student_id} className="border-t hover:bg-zinc-50">
+                            <td className="px-2 py-2">{i + 1}</td>
+                            <td className="px-2 py-2">
+                              <div className="flex items-center gap-2">
+                                <img src={buildPhotoUrl(stu)} alt={r.name} className="h-7 w-7 rounded-full border object-cover" />
+                                <span className="font-medium truncate max-w-[160px]">{r.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-2 py-2">
+                              <input type="checkbox" checked={r.present} onChange={() => togglePresent(r.student_id)} />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                disabled={!r.present}
+                                value={r.wrongStr}
+                                onChange={(e) => setWrongStr(r.student_id, e.target.value)}
+                                className="w-16 rounded border border-zinc-300 px-2 py-1 text-sm"
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {r.present ? `${fmt(score)}/${fmt(maxMarks)}` : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {rows.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-6 text-center text-zinc-500">No students</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div className="text-xs text-zinc-500">Press Save to publish</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={loadStudents}
+                      className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving || !testDate || totalQ === 0}
+                      className="inline-flex items-center gap-2 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white"
+                    >
+                      <CheckCircle2 size={14} />
+                      {saving ? "Saving…" : "Save Test"}
+                    </button>
+                  </div>
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
+
+          {/* RECENT LIST */}
+          <AnimatePresence initial={false} mode="wait">
+            {activeTab === "recent" && (
+              <motion.div
+                key="recent"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium">Recent Tests</div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="month"
+                      value={recentMonth}
+                      onChange={(e) => setRecentMonth(e.target.value)}
+                      className="rounded border border-zinc-300 px-2 py-1 text-xs"
+                    />
+                    <select
+                      value={recentFilter}
+                      onChange={(e) => setRecentFilter(e.target.value as SectionKey | "ALL")}
+                      className="rounded border border-zinc-300 px-2 py-1 text-xs"
+                    >
+                      <option value="ALL">All sections</option>
+                      <option value="MAT">MAT</option>
+                      <option value="ENGLISH">ENGLISH</option>
+                      <option value="MATHS">MATHS</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={`${fixedScrollCls} rounded border overflow-x-auto`}>
+                  <table className="w-full min-w-[520px] text-xs sm:text-sm">
+                    <thead className="sticky top-0 bg-zinc-50">
+                      <tr className="text-left text-zinc-600">
+                        <th className="px-2 py-2 whitespace-nowrap">Date</th>
+                        <th className="px-2 py-2 whitespace-nowrap">Section</th>
+                        <th className="px-2 py-2 whitespace-nowrap">Total Q</th>
+                        <th className="px-2 py-2 text-right whitespace-nowrap">Entries</th>
+                        <th className="px-2 py-2 text-right whitespace-nowrap">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingRecent ? (
+                        Array.from({ length: 4 }).map((_, i) => (
+                          <tr key={i} className="border-t">
+                            <td className="px-3 py-2"><div className="h-3 w-28 animate-pulse rounded bg-zinc-200" /></td>
+                            <td className="px-3 py-2"><div className="h-3 w-20 animate-pulse rounded bg-zinc-200" /></td>
+                            <td className="px-3 py-2"><div className="h-3 w-16 animate-pulse rounded bg-zinc-200" /></td>
+                            <td className="px-3 py-2 text-right"><div className="ml-auto h-3 w-10 animate-pulse rounded bg-zinc-200" /></td>
+                            <td className="px-3 py-2 text-right"><div className="ml-auto h-6 w-20 animate-pulse rounded bg-zinc-200" /></td>
+                          </tr>
+                        ))
+                      ) : recent.length === 0 ? (
+                        <tr><td colSpan={5} className="px-3 py-6 text-center text-zinc-500">No tests found</td></tr>
+                      ) : (
+                        recent.map((t) => (
+                          <tr key={t.id} className="border-t hover:bg-zinc-50">
+                            <td className="px-3 py-2 whitespace-nowrap">{new Date(t.test_date + "T00:00:00").toLocaleDateString("en-IN")}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{t.section}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{t.total_questions ?? 0}</td>
+                            <td className="px-3 py-2 text-right whitespace-nowrap">{t.marks_count}</td>
+                            <td className="px-3 py-2 text-right">
+                              {confirmDeleteId === t.id ? (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button onClick={() => setConfirmDeleteId(null)} className="rounded border px-2 py-1 text-xs">No</button>
+                                  <button onClick={() => doDelete(t.id)} className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700">Yes, delete</button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button onClick={() => openEdit(t)} className="rounded border px-2 py-1 text-xs">Edit</button>
+                                  <button onClick={() => setConfirmDeleteId(t.id)} className="rounded border px-2 py-1 text-xs text-red-600">Delete</button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Edit panel */}
+                <AnimatePresence>
+                  {editing && (
+                    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="mt-3 rounded-xl border bg-white p-3">
+                      <div className="mb-2 text-sm font-semibold">Edit test</div>
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                        <select value={editDraft.section} onChange={(e) => setEditDraft((d) => ({ ...d, section: e.target.value as SectionKey }))} className="rounded border border-zinc-300 px-3 py-2 text-sm">
+                          <option value="MAT">MAT</option>
+                          <option value="ENGLISH">ENGLISH</option>
+                          <option value="MATHS">MATHS</option>
+                        </select>
+                        <input type="date" value={editDraft.date} onChange={(e) => setEditDraft((d) => ({ ...d, date: e.target.value }))} className="rounded border border-zinc-300 px-3 py-2 text-sm" />
+                        <input inputMode="numeric" value={editDraft.totalQStr} onChange={(e) => setEditDraft((d) => ({ ...d, totalQStr: e.target.value.replace(/[^\d]/g, "") }))} className="rounded border border-zinc-300 px-3 py-2 text-sm" placeholder="0" />
+                      </div>
+                      <div className="mt-2 flex items-center justify-end gap-2">
+                        <button onClick={() => setEditing(null)} className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm">Cancel</button>
+                        <button onClick={saveEdit} className="inline-flex items-center gap-1 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">Save</button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

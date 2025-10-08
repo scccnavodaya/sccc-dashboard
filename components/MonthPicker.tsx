@@ -1,7 +1,9 @@
+// components/MonthPicker.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 
+/** compute current IST month string (YYYY-MM) — run only on client inside useEffect */
 function currentISTMonth(): string {
   const now = new Date();
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -21,11 +23,27 @@ export default function MonthPicker({
   value?: string;
   onChange: (ym: string) => void;
 }) {
-  const [local, setLocal] = useState(value || currentISTMonth());
+  // IMPORTANT: start with undefined so server HTML is stable (no Date calls during SSR)
+  const [local, setLocal] = useState<string | undefined>(value);
 
+  // Sync external `value` prop to local when it changes (client only)
   useEffect(() => {
-    if (value && value !== local) setLocal(value);
-  }, [value]); // eslint-disable-line
+    if (typeof window === "undefined") return;
+    if (value !== undefined && value !== local) setLocal(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  // If we don't have a local value (first client render), initialize it from current IST month
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!local) {
+      const ym = currentISTMonth();
+      setLocal(ym);
+      // also inform parent if they didn't pass `value` initially
+      if (!value) onChange(ym);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run only once on client mount
 
   return (
     <label className="inline-flex items-center gap-2 text-sm sm:text-[0.95rem] text-zinc-600 w-full max-w-[200px]">
@@ -41,7 +59,7 @@ export default function MonthPicker({
           outline-none
           focus:ring-2 focus:ring-emerald-300
         "
-        value={local}
+        value={local ?? ""}
         onChange={(e) => {
           setLocal(e.target.value);
           onChange(e.target.value);

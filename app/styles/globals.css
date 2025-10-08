@@ -4,21 +4,45 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Playfair+Display:wght@600&display=swap');
 
 /* ------------------------------------------------
-   Tailwind layers — use directives, not direct imports
+   Tailwind layers
 -------------------------------------------------- */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ------------------------------------------------
-   Base
+   FIXED: App-level sizing (prevents outer scrollbar)
+   Make the page full height and stop page-level vertical scrolling.
+   Use an inner scroll container for any content that needs to scroll.
+-------------------------------------------------- */
+html, body, #__next {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  /* hide outer vertical scroll — inner content should scroll */
+  overflow-x: hidden;
+  overflow-y: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Inner scroll utility: use this on the element that should scroll
+   instead of allowing the body to scroll. Example: .app-card > .inner-scroll */
+.inner-scroll {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ------------------------------------------------
+   Base (copied from original with minor safety tweaks)
 -------------------------------------------------- */
 html, body {
   font-family: 'Poppins', sans-serif;
   color: #0a0a0a;
   background: #ffffff;
-  overflow-x: hidden;              /* prevent horizontal scrollbars */
-  -webkit-text-size-adjust: 100%;  /* iOS text zoom consistency */
 }
 
 h1, h2, h3, h4 {
@@ -35,7 +59,7 @@ h1, h2, h3, h4 {
   -webkit-text-fill-color: transparent;
 }
 
-/* Media must never overflow their container */
+/* Media must never overflow */
 img, video, canvas, svg {
   max-width: 100%;
   height: auto;
@@ -43,10 +67,10 @@ img, video, canvas, svg {
   object-fit: cover;
 }
 
-/* Prevent flex children from overflowing rows */
+/* Prevent flex children from overflowing */
 * { min-width: 0; }
 
-/* Better body containment on mobile */
+/* Better containment */
 .mobile-rescue {
   width: 100%;
   overflow-x: hidden;
@@ -56,13 +80,9 @@ img, video, canvas, svg {
 }
 
 /* ------------------------------------------------
-   Desktop scaling wrappers (kept, but safer on mobile)
-   We KEEP your classes, but STOP the transform
-   on small screens to avoid blur & tiny tap targets.
+   Desktop wrappers
 -------------------------------------------------- */
-
-/* Public pages */
-.app-viewport {
+.app-viewport, .admin-viewport {
   width: 100vw;
   min-height: 100vh;
   overflow-x: hidden;
@@ -70,65 +90,49 @@ img, video, canvas, svg {
   background: inherit;
 }
 
-.app-canvas {
-  width: 1200px;           /* base desktop width */
+.app-canvas, .admin-canvas {
+  width: 1200px;
   margin: 0 auto;
   transform-origin: top center;
 }
 
-/* Admin pages */
-.admin-viewport {
-  width: 100vw;
-  min-height: 100vh;
-  overflow-x: hidden;
-  display: block;
-  background: inherit;
-}
-
-.admin-canvas {
-  width: 1200px;           /* base desktop width */
-  margin: 0 auto;
-  transform-origin: top center;
-}
-
-/* For <=1200px, be fluid (no scale()) */
+/* Fluid below 1200px */
 @media (max-width: 1200px) {
-  .app-canvas,
-  .admin-canvas {
+  .app-canvas, .admin-canvas {
     width: 100%;
-    transform: none;            /* remove scale() */
+    transform: none;
     min-height: auto;
-    padding-left: 12px;         /* gentle gutters */
+    padding-left: 12px;
     padding-right: 12px;
   }
 }
 
-/* Optional: slightly scale up on ultra-wide desktops */
+/* Slight scale up for large screens */
 @media (min-width: 1600px) {
-  .app-canvas,
-  .admin-canvas { transform: scale(1.05); }
+  .app-canvas, .admin-canvas { transform: scale(1.05); }
 }
 @media (min-width: 1920px) {
-  .app-canvas,
-  .admin-canvas { transform: scale(1.12); }
+  .app-canvas, .admin-canvas { transform: scale(1.12); }
 }
 
 /* ------------------------------------------------
-   One-pass mobile fixes (no JSX changes required)
+   One-pass mobile fixes (no JSX change required)
 -------------------------------------------------- */
 
-/* 1) Auto-fix tables when inside common card shells on phones */
+/* 1) Auto-fix tables (removed min-width 720px) */
 @media (max-width: 768px) {
   .rounded-2xl:has(table),
   .card:has(table),
   .border:has(table) {
-    overflow-x: auto;                        /* horizontal scroll when table is wider */
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
   .rounded-2xl:has(table) table,
   .card:has(table) table,
   .border:has(table) table {
-    min-width: 720px;                        /* keep desktop columns intact */
+    min-width: unset;
+    width: 100%;
+    table-layout: auto;
   }
 }
 
@@ -143,40 +147,35 @@ thead.sticky-top,
   backdrop-filter: saturate(1.2) blur(2px);
 }
 
-/* 3) Card shells safely contain children (media/gradients) */
+/* 3) Card shell containment */
 .card,
 .rounded-2xl { overflow: hidden; }
 
-/* 4) Explicit table scroller utility (use on any wrapper) */
+/* 4) Explicit table scroller */
 .table-scroll {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
-.table-scroll > table { min-width: 720px; }
+.table-scroll > table { min-width: unset; width: 100%; }
 
 /* ------------------------------------------------
-   Responsive helpers you can use anywhere
+   Responsive helpers
 -------------------------------------------------- */
-
-/* Softer shadow for elevated surfaces */
 .soft-shadow {
   box-shadow: 0 6px 24px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
 }
 
-/* Compact stack spacing on small screens */
 .stack-sm > * + * { margin-top: 0.5rem; }
 
-/* Utility to keep labels/info from shrinking */
 .no-shrink { flex-shrink: 0; }
 
-/* Prevent long tokens/IDs from breaking layout */
 .break-anywhere {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-/* Comfortable tap targets on phones */
+/* Comfortable tap targets */
 @media (max-width: 640px) {
   input[type="text"],
   input[type="date"],
@@ -191,9 +190,9 @@ thead.sticky-top,
   button, .btn { touch-action: manipulation; }
 }
 
-/* Tighten table paddings for small screens */
+/* Compact tables */
 @media (max-width: 640px) {
-  table th, table td { padding: 0.5rem 0.5rem; }
+  table th, table td { padding: 0.45rem 0.5rem; }
 }
 
 /* Thin progress bars */
@@ -204,15 +203,13 @@ thead.sticky-top,
   border-radius: 9999px;
 }
 
-/* Clamp text lines (fallback if no Tailwind plugin) */
+/* Line clamps */
 .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* When you need fixed-width grid on desktop but scroll on phone */
 .grid-wide { min-width: 980px; }
 
-/* Avatar crispness */
 .avatar {
   border-radius: 9999px;
   object-fit: cover;
@@ -220,7 +217,7 @@ thead.sticky-top,
 }
 
 /* ------------------------------------------------
-   Safe area padding for iOS
+   Safe area padding
 -------------------------------------------------- */
 .safe-x {
   padding-left: env(safe-area-inset-left, 0);
@@ -232,20 +229,17 @@ thead.sticky-top,
 }
 
 /* ------------------------------------------------
-   Helpful layout utilities for your pages
+   Layout utilities
 -------------------------------------------------- */
-
-/* Grid spacing that adapts to viewport */
 .grid-safe { gap: clamp(0.5rem, 2vw, 1rem); }
 
-/* Large numbers in stat cards stay tidy */
 .stat-value {
   line-height: 1.15;
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
-/* Sticky header/footer helpers */
+/* Sticky header/footer */
 .app-header,
 .app-footer {
   position: sticky;
@@ -255,22 +249,360 @@ thead.sticky-top,
 .app-header { top: 0; }
 .app-footer { bottom: 0; }
 
-/* Framer-motion containment to avoid scroll jank on phones */
+/* If duplicate footers accidentally exist, hide all but the last one.
+   This is defensive: you should still remove duplicate markup when possible. */
+.app-footer:not(:last-child) {
+  display: none !important;
+}
+
+/* motion container */
 .motion-container {
   transform: translateZ(0);
   will-change: transform, opacity;
 }
 
 /* ------------------------------------------------
-   NEW: Dynamic header spacer + notice clamp
+   Dynamic header spacer + notice clamp
 -------------------------------------------------- */
-
-/* Spacer that always equals header height */
 .header-spacer {
-  height: var(--header-h, 112px); /* fallback 112px */
+  height: var(--header-h, 72px); /* reduced default header space */
 }
 
-/* Notice Board inner container should not overflow */
 .notice-card-inner {
   overflow: hidden;
 }
+
+/* ------------------------------------------------
+   Compact / mobile adjustments (70% scale + sizing)
+   These rules target the public page to make it compact
+-------------------------------------------------- */
+
+/* Global mobile-scale wrapper — set this in your page root */
+@media (max-width: 640px) {
+  .mobile-scale {
+    transform-origin: top center;
+    transform: scale(0.7);    /* requested 70% scale on small devices */
+    width: 100%;
+    margin: 0 auto;
+    -webkit-transform-origin: top center;
+    -webkit-transform: scale(0.7);
+    /* Ensure content doesn't get hidden below the bottom nav: add safe padding */
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+
+  /* reduce overall page paddings for compactness */
+  .mobile-scale .mx-auto,
+  .mobile-scale .px-3,
+  .mobile-scale .px-2 {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+
+  /* reduce header spacer extra vertical gap */
+  .header-spacer { height: var(--header-h, 56px); }
+
+  /* tighten StatCards vertical padding & font sizes */
+  .rounded-2xl.border.bg-white.p-3 {
+    padding: 10px !important;
+  }
+  .rounded-2xl.border.bg-white.p-3 .stat-value {
+    font-size: 20px !important;
+  }
+  .rounded-2xl.border.bg-white.p-3 .text-sm {
+    font-size: 12px !important;
+  }
+
+  /* Ticker / latest small font and height */
+  header .ticker,
+  header .min-w-0 > div {
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+  }
+
+  /* Constrain leaderboard and notice: same heights + scroll after ~4 rows */
+  /* these selectors target Tailwind-generated classes like max-h-[220px] */
+  [class*="max-h-[220px]"], [class*="max-h-\\[220px\\]"] {
+    max-height: 220px !important;
+  }
+  [class*="max-h-[420px]"], [class*="max-h-\\[420px\\]"] {
+    max-height: 420px !important;
+  }
+
+  /* When we wrap the leaderboard in an overflow-y area, make scrollbars slim */
+  .max-h-[220px], .max-h-\\[220px\\] {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .max-h-[220px]::-webkit-scrollbar,
+  .max-h-\\[220px\\]::-webkit-scrollbar {
+    width: 9px;
+  }
+  .max-h-[220px]::-webkit-scrollbar-thumb,
+  .max-h-\\[220px\\]::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.12);
+    border-radius: 8px;
+  }
+
+  /* NoticeCarousel inner area small padding */
+  .notice-card-inner, .rounded-2xl.notice {
+    padding: 6px !important;
+  }
+
+  /* Reduce carousel dot/pip sizes */
+  .carousel-dots, .slick-dots {
+    transform: scale(0.9);
+  }
+
+  /* compact leaderboard rows (assumes default table row heights) */
+  .rounded-2xl:has(table) table tbody tr td,
+  .rounded-2xl:has(table) table tbody tr th {
+    padding-top: 0.4rem !important;
+    padding-bottom: 0.4rem !important;
+  }
+
+  /* avoid huge whitespace between header/ticker and content */
+  .mobile-rescue { padding-top: 0 !important; }
+
+  /* small-screen specific: make fonts slightly smaller globally inside scaled area */
+  .mobile-scale, .mobile-scale * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Slightly larger phones (between 641px and 900px) — milder scale */
+@media (min-width: 641px) and (max-width: 900px) {
+  .mobile-scale {
+    transform-origin: top center;
+    transform: scale(0.85);
+    width: 100%;
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+  .mobile-rescue { padding-top: 4px !important; }
+}
+
+/* ------------------------------------------------
+   Small cosmetic helpers not tied to Tailwind classes
+-------------------------------------------------- */
+
+/* Small shadow for compact cards */
+.compact-shadow {
+  box-shadow: 0 3px 10px rgba(0,0,0,0.04);
+}
+
+/* Utility to visually cap large empty bands (safety) */
+.reduced-gap-fix {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* Make sure the main ticker inline animation doesn't overflow page horizontally */
+.ticker {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+/* ------------------------------------------------
+   Bottom tab bar (Facebook/Instagram-like) styles
+   Added for Phase 2 bottom navigation component
+-------------------------------------------------- */
+
+/* container for bottom nav — keeps it centered and elevated */
+.bottom-tabbar-wrapper {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 8px; /* lifted slightly so it's not flush against screen edge */
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  pointer-events: none; /* parent container will carry pointer events on inner content */
+}
+
+/* actual bar: rounded, semi-opaque, shadowed */
+.bottom-tabbar {
+  pointer-events: auto;
+  background: rgba(255,255,255,0.96);
+  backdrop-filter: blur(6px) saturate(1.05);
+  border: 1px solid rgba(16,185,129,0.06);
+  border-radius: 14px;
+  padding: 6px 10px;
+  box-shadow: 0 8px 30px rgba(16,185,129,0.06);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* the invisible spacer ensures page content not overlapped when bar is fixed */
+.bottom-nav-spacer {
+  height: calc(78px + env(safe-area-inset-bottom));
+}
+
+/* small pill that appears above active icon (animated by framer-motion) */
+.bottom-active-pill {
+  display: inline-block;
+  border-radius: 9999px;
+  padding: 0.15rem 0.45rem;
+  font-size: 10px;
+  font-weight: 600;
+  color: #065f46; /* emerald-800 */
+  background: rgba(16,185,129,0.06); /* subtle tint */
+  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+}
+
+/* optional shine animation (use class .bottom-pill-shine) */
+@keyframes sccc-pill-shine {
+  0% { opacity: 0; transform: translateY(8px) scaleX(0.96); }
+  45% { opacity: 1; transform: translateY(-2px) scaleX(1.02); }
+  100% { opacity: 1; transform: translateY(0) scaleX(1); }
+}
+.bottom-pill-shine {
+  animation: sccc-pill-shine 420ms cubic-bezier(.2,.9,.3,1);
+}
+
+/* icon + label tuning inside the tabbar (keeps touch targets comfy) */
+.bottom-tabbar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+}
+
+/* active vs inactive */
+.bottom-tabbar .active-icon {
+  color: #059669; /* emerald-500 */
+}
+.bottom-tabbar .inactive-icon {
+  color: rgba(17,24,39,0.6); /* zinc-700ish */
+}
+
+/* focus ring for keyboard users */
+.bottom-tabbar button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(16,185,129,0.12);
+  border-radius: 8px;
+}
+
+/* reduce hit area on very narrow screens while preserving touch target */
+@media (max-width: 420px) {
+  .bottom-tabbar { padding-left: 6px; padding-right: 6px; }
+  .bottom-tabbar button { padding: 6px; gap: 2px; }
+  .bottom-active-pill { font-size: 9px; padding: 0.12rem 0.35rem; }
+}
+
+/* ------------------------------------------------
+   Defensive: when mobile-scale is applied we already add bottom padding,
+   but ensure on other wrappers as well so bottom nav never overlaps content.
+-------------------------------------------------- */
+body,
+.main-content,
+.app-canvas,
+.admin-canvas {
+  /* base safe bottom padding for devices without mobile-scale wrapper */
+  padding-bottom: calc(78px + env(safe-area-inset-bottom));
+}
+
+/* ------------------------------------------------
+   Small helper: no-scrollbar
+   Useful for horizontally scrollable tabbars etc.
+-------------------------------------------------- */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ------------------------------------------------
+   Admin-bottom-bar specific helpers
+   These are used by the AdminBottomBar component (mobile fixed bar)
+   We render the component outside the scaled canvas so it stays at real viewport size.
+-------------------------------------------------- */
+
+.admin-bottombar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 160;
+  background: rgba(255,255,255,0.98);
+  backdrop-filter: blur(6px) saturate(1.05);
+  border-top: 1px solid rgba(0,0,0,0.04);
+  padding: 8px 10px;
+  box-shadow: 0 -8px 30px rgba(2,6,23,0.04);
+}
+
+.admin-bottombar .admin-bottom-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* horizontally scrollable tabs area */
+.admin-bottombar .admin-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.admin-bottombar .admin-tabs.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.admin-bottombar .admin-tabs.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* each tab button */
+.admin-bottombar button.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: rgba(17,24,39,0.65);
+  font-size: 12px;
+}
+.admin-bottombar button.tab.active {
+  color: #059669;
+  background: rgba(16,185,129,0.06);
+}
+
+/* center FAB wrapper to keep it above the bar when needed */
+.admin-bottombar .fab-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  margin-right: 6px;
+}
+
+/* FAB */
+.admin-bottombar .fab {
+  height: 48px;
+  width: 48px;
+  border-radius: 9999px;
+  background: #059669;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 22px rgba(5,102,105,0.18);
+  border: 4px solid rgba(255,255,255,0.9);
+}
+
+/* small screens — tighter pill and smaller icons */
+@media (max-width: 420px) {
+  .admin-bottombar { padding-left: 6px; padding-right: 6px; }
+  .admin-bottombar button.tab { padding: 6px; gap: 4px; font-size: 11px; }
+  .admin-bottombar .fab { height: 44px; width: 44px; }
+}
+
+/* ------------------------------------------------
+   End of globals.css
+-------------------------------------------------- */

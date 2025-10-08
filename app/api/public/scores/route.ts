@@ -32,9 +32,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Invalid ym" }, { status: 400 });
     }
 
+    // Use start/end date strings (YYYY-MM-DD)
     const start = new Date(Date.UTC(year, month - 1, 1));
     const end = new Date(Date.UTC(year, month, 1));
-    const startISO = start.toISOString().slice(0, 10); // YYYY-MM-DD
+    // Use only date portion (this is safe if test_date column is DATE)
+    const startISO = start.toISOString().slice(0, 10);
     const endISO = end.toISOString().slice(0, 10);
 
     // 1) Tests in the month
@@ -46,11 +48,12 @@ export async function GET(req: Request) {
       .order("test_date", { ascending: true });
 
     if (tErr) {
-      return NextResponse.json({ error: tErr.message }, { status: 400 });
+      console.error("[api/public/scores] tests query error:", tErr);
+      return NextResponse.json({ error: tErr.message, tests: [], marks: [] }, { status: 500 });
     }
 
     // 2) Marks for those tests
-    const testIds = (tests ?? []).map((t) => t.id);
+    const testIds = (tests ?? []).map((t: any) => t?.id).filter(Boolean);
     let marks: Array<{ test_id: string; student_id: string; score: number | null }> = [];
 
     if (testIds.length > 0) {
@@ -60,32 +63,40 @@ export async function GET(req: Request) {
         .in("test_id", testIds);
 
       if (mErr) {
-        return NextResponse.json({ error: mErr.message }, { status: 400 });
+        console.error("[api/public/scores] marks query error:", mErr);
+        return NextResponse.json({ error: mErr.message, tests: tests ?? [], marks: [] }, { status: 500 });
       }
-      marks = (marksRows ?? []).map((m) => ({
-        test_id: m.test_id,
-        student_id: m.student_id,
-        score: m.score, // may be null => absent
+
+      marks = (marksRows ?? []).map((m: any) => ({
+        test_id: String(m.test_id),
+        student_id: String(m.student_id),
+        score: m.score === null ? null : Number(m.score),
       }));
     }
 
-    return new NextResponse(
-      JSON.stringify({
-        tests: tests ?? [],
-        marks,
-      }),
-      {
-        status: 200,
-        headers: {
-          "content-type": "application/json",
-          "cache-control": "public, s-maxage=60, stale-while-revalidate=60",
-        },
-      }
-    );
+    // Always return stable shape
+    const payload = {
+      tests: (tests ?? []).map((t: any) => ({
+        id: String(t.id ?? ""),
+        section: (t.section ?? "").toString(),
+        test_date: String(t.test_date ?? ""),
+      })),
+      marks,
+    };
+
+    // Server-side log to help debugging
+    console.log(`[api/public/scores] ym=${ym} -> tests=${payload.tests.length} marks=${payload.marks.length}`);
+
+    return new NextResponse(JSON.stringify(payload), {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        // short edge cache; adjust as needed
+        "cache-control": "public, s-maxage=60, stale-while-revalidate=60",
+      },
+    });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message || "Server error" },
-      { status: 500 }
-    );
+    console.error("[api/public/scores] unhandled error:", e);
+    return NextResponse.json({ error: e?.message || "Server error", tests: [], marks: [] }, { status: 500 });
   }
 }

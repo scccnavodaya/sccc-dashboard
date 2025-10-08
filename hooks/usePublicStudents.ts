@@ -2,7 +2,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type PublicStudent = {
   id: string;
@@ -10,8 +10,12 @@ export type PublicStudent = {
   photo: string | null; // fully-qualified public URL or null
 };
 
-// SWR v2 fetcher supports { signal }
-async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
+// SWR v2 fetcher supports { signal } but older callers might not pass it.
+// Provide a safe default param to avoid destructuring undefined.
+async function swrFetcher(
+  key: string,
+  { signal }: { signal?: AbortSignal } = {}
+) {
   const res = await fetch(key, {
     credentials: "include",
     cache: "no-store",
@@ -41,15 +45,27 @@ async function swrFetcher(key: string, { signal }: { signal?: AbortSignal }) {
 }
 
 /**
- * Fetch public student list (optionally filtered by query).
- * Automatically revalidates and supports Supabase realtime.
+ * Fetch public student list.
+ *
+ * opts:
+ *  - q?: string          -> text query appended as ?q=...
+ *  - realtime?: boolean  -> enable supabase realtime revalidation (default true)
+ *  - ym?: string         -> optional YYYY-MM to request students for a month
+ *
+ * Examples:
+ *  usePublicStudents()                          -> GET /api/public/students
+ *  usePublicStudents({ ym: "2025-10" })         -> GET /api/public/students?ym=2025-10
+ *  usePublicStudents({ q: "alex" })             -> GET /api/public/students?q=alex
+ *  usePublicStudents({ q: "a", ym: "2025-10" }) -> GET /api/public/students?q=a&ym=2025-10
  */
-export function usePublicStudents(opts?: { q?: string; realtime?: boolean }) {
-  const { q, realtime = true } = opts ?? {};
+export function usePublicStudents(opts?: { q?: string; realtime?: boolean; ym?: string }) {
+  const { q, realtime = true, ym } = opts ?? {};
 
-  const key = q?.trim()
-    ? `/api/public/students?q=${encodeURIComponent(q.trim())}`
-    : "/api/public/students";
+  // build key with optional query params
+  const params: string[] = [];
+  if (q?.trim()) params.push(`q=${encodeURIComponent(q.trim())}`);
+  if (ym?.trim()) params.push(`ym=${encodeURIComponent(ym.trim())}`);
+  const key = params.length ? `/api/public/students?${params.join("&")}` : "/api/public/students";
 
   const { data, error, isLoading, mutate } = useSWR<PublicStudent[]>(
     key,
@@ -64,7 +80,7 @@ export function usePublicStudents(opts?: { q?: string; realtime?: boolean }) {
     }
   );
 
-  // Supabase client (browser-only dynamic import)
+  // Supabase client (browser-only dynamic import) for realtime
   const [supabase, setSupabase] = useState<any | null>(null);
 
   useEffect(() => {

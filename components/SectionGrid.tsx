@@ -1,3 +1,4 @@
+// components/SectionGrid.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -16,14 +17,12 @@ type BaseStudent = {
 type MaxScore = number | ((s: BaseStudent) => number);
 
 type SectionProps = {
-  /** omit or "section" = section table with present/absent */
   mode?: "section";
   section: SectionKey;
   students: BaseStudent[];
-  /** optional height class for scrollable body */
   fixedBodyHeightClass?: string;
-  /** max score to display (number or function per student) */
   maxScore?: MaxScore;
+  accentClass?: string; // NEW: theme accent for badges/pills
 };
 
 type OverallProps = {
@@ -31,18 +30,18 @@ type OverallProps = {
   students: BaseStudent[];
   fixedBodyHeightClass?: string;
   maxScore?: MaxScore;
+  accentClass?: string;
 };
 
 type Props = SectionProps | OverallProps;
 
-/** Format up to 2 decimals (strip .00) */
 function fmt(n: number) {
   if (!Number.isFinite(n)) return "—";
   const s = (Math.round(n * 100) / 100).toFixed(2);
   return s.replace(/\.00$/, "");
 }
 
-/** WhatsApp-like avatar tap-to-preview */
+/** Tap avatar → fullscreen preview (mobile-friendly) */
 function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
   const [open, setOpen] = useState(false);
 
@@ -66,14 +65,14 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
         <img
           src={src}
           alt={name}
-          className="h-7 w-7 sm:h-7 sm:w-7 cursor-zoom-in rounded-full border border-zinc-200 object-cover shrink-0"
+          className="h-7 w-7 cursor-zoom-in rounded-full border border-zinc-200 object-cover shrink-0"
           onClick={() => setOpen(true)}
         />
       ) : (
         <button
           onClick={() => setOpen(true)}
           title={name}
-          className="grid h-7 w-7 sm:h-7 sm:w-7 place-items-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700 shrink-0"
+          className="grid h-7 w-7 place-items-center rounded-full bg-zinc-300 text-[10px] font-semibold text-zinc-700 shrink-0"
         >
           {initials}
         </button>
@@ -81,32 +80,27 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
 
       {open && (
         <div
-          className="fixed inset-0 z-[70] bg-black/70 p-4 backdrop-blur-sm
-                     pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
-                     pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+          className="fixed inset-0 z-[80] bg-black/70 p-4 flex items-center justify-center"
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label={`${name} photo preview`}
         >
           <div
-            className="mx-auto mt-16 w-full max-w-xs"
+            className="max-w-xs w-full bg-zinc-900 rounded-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="overflow-hidden rounded-2xl border border-white/10 shadow-2xl">
-              {src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={src} alt={name} className="h-full w-full object-cover" />
-              ) : (
-                <div className="grid h-72 w-full place-items-center bg-zinc-800 text-4xl font-bold text-white">
-                  {initials}
-                </div>
-              )}
-            </div>
-            <div className="mt-3 text-center text-sm text-white/95">{name}</div>
+            {src ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={src} alt={name} className="w-full h-72 object-cover" />
+            ) : (
+              <div className="grid h-72 w-full place-items-center bg-zinc-800 text-4xl font-bold text-white">
+                {initials}
+              </div>
+            )}
+            <div className="p-3 text-center text-white text-sm font-medium truncate">{name}</div>
             <button
-              className="mx-auto mt-3 block h-10 rounded-md bg-white/90 px-4 text-sm font-medium text-zinc-900 hover:bg-white"
               onClick={() => setOpen(false)}
+              className="mx-auto mb-3 block rounded-md bg-white/90 px-4 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
             >
               Close
             </button>
@@ -118,46 +112,52 @@ function AvatarPreview({ src, name }: { src?: string | null; name: string }) {
 }
 
 export default function SectionGrid(props: Props) {
-  // Taller default on small screens so content breathes; still scrolls inside.
-  const fixedBodyHeightClass =
-    props.fixedBodyHeightClass ??
-    "h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px]";
+  // reduced heights so grid + feedback fit in mobile viewport
+  const fixedBodyHeightClass = props.fixedBodyHeightClass ?? "h-[160px] sm:h-[220px] md:h-[260px] lg:h-[300px]";
 
-  const students = props.students;
+  const students = props.students ?? [];
+  const accentClass = (props as any).accentClass ?? "bg-emerald-100 text-emerald-800";
 
   const { rowsPresent, rowsAbsent, mode } = useMemo(() => {
-    if (props.mode === "overall") {
+    if ((props as OverallProps).mode === "overall") {
       const present = students.map((s) => ({
         id: s.id,
         name: s.name,
         photo: s.photo ?? null,
-        score:
-          (Number(s.mat ?? 0) || 0) +
-          (Number(s.eng ?? 0) || 0) +
-          (Number(s.maths ?? 0) || 0),
-        src: s as BaseStudent,
+        score: (Number(s.mat ?? 0) || 0) + (Number(s.eng ?? 0) || 0) + (Number(s.maths ?? 0) || 0),
+        src: s,
       }));
       present.sort((a, b) => b.score - a.score);
-      return { rowsPresent: present, rowsAbsent: [] as any[], mode: "overall" as const };
+      return { rowsPresent: present, rowsAbsent: [], mode: "overall" as const };
     }
 
-    const field: keyof BaseStudent =
-      props.section === "MAT" ? "mat" : props.section === "ENGLISH" ? "eng" : "maths";
+    const section = (props as SectionProps).section;
+    const field: keyof BaseStudent = section === "MAT" ? "mat" : section === "ENGLISH" ? "eng" : "maths";
 
-    const present: Array<{ id: string; name: string; photo?: string | null; score: number; src: BaseStudent }> = [];
-    const absent: Array<{ id: string; name: string; photo?: string | null; src: BaseStudent }> = [];
+    const present: any[] = [];
+    const absent: any[] = [];
 
     for (const s of students) {
       const v = s[field] as number | null | undefined;
-      if (v == null) {
-        absent.push({ id: s.id, name: s.name, photo: s.photo ?? null, src: s });
-      } else {
-        present.push({ id: s.id, name: s.name, photo: s.photo ?? null, score: v, src: s });
-      }
+      if (v == null) absent.push({ ...s });
+      else present.push({ ...s, score: v });
     }
+
     present.sort((a, b) => b.score - a.score);
     return { rowsPresent: present, rowsAbsent: absent, mode: "section" as const };
-  }, [props.mode, (props as any).section, students]);
+  }, [(props as any).mode, (props as any).section, students]);
+
+  // compute normalized status: Present / Fail / Absent
+  function computeStatus(score: number | null | undefined, student: BaseStudent) {
+    if (score == null) return { label: "Absent", variant: "absent" as const };
+    const max = (props as any).maxScore as MaxScore | undefined;
+    if (max == null) return { label: "Present", variant: "present" as const };
+    const full = typeof max === "function" ? (max as any)(student) : (max as number);
+    if (!Number.isFinite(full) || full <= 0) return { label: "Present", variant: "present" as const };
+    const pct = (Number(score) / full) * 100;
+    if (pct >= 33) return { label: "Present", variant: "present" as const }; // threshold: >=33% considered Present
+    return { label: "Fail", variant: "fail" as const };
+  }
 
   function renderScore(obtained: number, student: BaseStudent) {
     const max = (props as any).maxScore as MaxScore | undefined;
@@ -172,82 +172,73 @@ export default function SectionGrid(props: Props) {
   const rowPad = "py-2";
 
   return (
-    <div
-      className="
-        rounded-2xl border border-zinc-200 card
-        w-full max-w-full
-        overflow-hidden
-      "
-    >
-      {/* Scroll inside body; add horizontal scroll only on *very* small widths */}
+    <div className="rounded-2xl border border-zinc-200 overflow-hidden bg-white">
       <div className={`${fixedBodyHeightClass} overflow-y-auto`}>
-        <div className="w-full overflow-x-auto">
-          <table
-            className={`w-full border-collapse ${textSize} min-w-[420px] sm:min-w-[520px]`}
-            aria-label={props.mode === "overall" ? "Overall scores" : `${(props as SectionProps).section} test scores`}
-          >
+        <div className="w-full">
+          <table className={`w-full border-collapse ${textSize}`} aria-label={(props as any).mode === "overall" ? "Overall scores" : `${(props as SectionProps).section} scores`}>
             <thead className="sticky top-0 bg-zinc-50">
               <tr className="text-zinc-600">
-                <th className={`px-3 ${headPad} text-left whitespace-nowrap`}>Rank</th>
+                <th className={`px-3 ${headPad} text-left w-[40px]`}>#</th>
                 <th className={`px-3 ${headPad} text-left`}>Student</th>
-                <th className={`px-3 ${headPad} text-right whitespace-nowrap`}>Score</th>
-                <th className={`px-3 ${headPad} text-right whitespace-nowrap`}>Status</th>
+                <th className={`px-3 ${headPad} text-right`}>Score</th>
+                <th className={`px-3 ${headPad} text-right`}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {rowsPresent.map((r, i) => (
-                <tr
-                  key={`p-${r.id}`}
-                  className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
-                >
-                  <td className={`px-3 ${rowPad} align-middle whitespace-nowrap`}>{i + 1}</td>
-                  <td className={`px-3 ${rowPad}`}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <AvatarPreview src={r.photo ?? undefined} name={r.name} />
-                      <span className="truncate font-medium break-anywhere">{r.name}</span>
-                    </div>
-                  </td>
-                  <td className={`px-3 ${rowPad} text-right font-semibold tabular-nums`}>
-                    {renderScore(r.score, r.src)}
-                  </td>
-                  <td className={`px-3 ${rowPad} text-right`}>
-                    {mode === "section" ? (
-                      <span className="rounded-full bg-emerald-100 px-2 py-[1px] text-[10px] font-medium text-emerald-800">
-                        Present
-                      </span>
-                    ) : (
-                      <span className="text-zinc-400">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {rowsPresent.map((r, i) => {
+                const st = computeStatus(r.score, r);
+                // pick classes based on variant
+                const badgeClass =
+                  st.variant === "absent"
+                    ? "rounded-full bg-red-100 px-2 py-[1px] text-[10px] font-medium text-red-700"
+                    : st.variant === "fail"
+                    ? "rounded-full bg-red-100 px-2 py-[1px] text-[10px] font-medium text-red-700"
+                    : // present uses accent
+                      `rounded-full px-2 py-[1px] text-[10px] font-medium ${accentClass}`;
 
-              {mode === "section" &&
-                rowsAbsent.map((r) => (
-                  <tr
-                    key={`a-${r.id}`}
-                    className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/60"
-                  >
-                    <td className={`px-3 ${rowPad} whitespace-nowrap`}>—</td>
+                return (
+                  <tr key={`p-${r.id}`} className="border-t border-zinc-100 hover:bg-zinc-50/70">
+                    <td className={`px-3 ${rowPad} text-zinc-700`}>{i + 1}</td>
                     <td className={`px-3 ${rowPad}`}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <AvatarPreview src={r.photo ?? undefined} name={r.name} />
-                        <span className="truncate font-medium break-anywhere">{r.name}</span>
+                      <div className="flex items-center gap-2">
+                        <AvatarPreview src={r.photo} name={r.name} />
+                        <span className="truncate font-medium text-zinc-800 leading-snug">
+                          {r.name}
+                        </span>
                       </div>
                     </td>
-                    <td className={`px-3 ${rowPad} text-right text-zinc-400`}>—</td>
+                    <td className={`px-3 ${rowPad} text-right font-semibold`}>{renderScore(r.score, r)}</td>
                     <td className={`px-3 ${rowPad} text-right`}>
-                      <span className="rounded-full bg-red-100 px-2 py-[1px] text-[10px] font-medium text-red-700">
-                        Absent
-                      </span>
+                      <span className={badgeClass}>{st.label}</span>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
+
+              {mode === "section" &&
+                rowsAbsent.map((r) => {
+                  const st = { label: "Absent", variant: "absent" as const };
+                  return (
+                    <tr key={`a-${r.id}`} className="border-t border-zinc-100 hover:bg-zinc-50/70">
+                      <td className={`px-3 ${rowPad} text-zinc-400`}>—</td>
+                      <td className={`px-3 ${rowPad}`}>
+                        <div className="flex items-center gap-2">
+                          <AvatarPreview src={r.photo} name={r.name} />
+                          <span className="truncate font-medium text-zinc-800">{r.name}</span>
+                        </div>
+                      </td>
+                      <td className={`px-3 ${rowPad} text-right text-zinc-400`}>—</td>
+                      <td className={`px-3 ${rowPad} text-right`}>
+                        <span className="rounded-full bg-red-100 px-2 py-[1px] text-[10px] font-medium text-red-700">Absent</span>
+                      </td>
+                    </tr>
+                  );
+                })}
 
               {rowsPresent.length + rowsAbsent.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
-                    No data
+                  <td colSpan={4} className="px-3 py-6 text-center text-zinc-500 text-sm">
+                    No data available
                   </td>
                 </tr>
               )}

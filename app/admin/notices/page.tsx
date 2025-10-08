@@ -64,6 +64,9 @@ export default function AdminNoticesPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showOlder, setShowOlder] = useState(false);
 
+  // UI: which vertical tab is active — "new" | "recent"
+  const [activeTab, setActiveTab] = useState<"new" | "recent">("new");
+
   // ======= helpers =======
   function resetForm() {
     setTitle("");
@@ -133,6 +136,7 @@ export default function AdminNoticesPage() {
 
   useEffect(() => {
     loadRecent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ======= file handling =======
@@ -206,6 +210,9 @@ export default function AdminNoticesPage() {
 
       setBanner({ type: "success", msg: "Notice uploaded successfully." });
       resetForm();
+
+      // switch to recent after publish
+      setActiveTab("recent");
       await loadRecent();
     } catch (err: any) {
       setBanner({ type: "error", msg: err?.message || "Failed to upload" });
@@ -235,374 +242,368 @@ export default function AdminNoticesPage() {
   const top3 = useMemo(() => recent.slice(0, 3), [recent]);
   const older = useMemo(() => recent.slice(3), [recent]);
 
+  // --- UI: single vertical card with New / Recent toggle ---
   return (
-    <div className="safe-x mx-auto w-full max-w-screen-xl px-3 sm:px-4 lg:px-6 py-4">
-      {/* Top bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Link
-            href="/admin"
-            className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
-          >
-            <ArrowLeft size={16} /> Back to Dashboard
-          </Link>
-          <h2 className="text-lg sm:text-xl font-semibold truncate">Notices</h2>
-        </div>
-      </div>
-
-      {/* Banner */}
-      <AnimatePresence>
-        {banner && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            className={classNames(
-              "mb-3 rounded-md px-3 py-2 text-sm",
-              banner.type === "success"
-                ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border border-red-200 bg-red-50 text-red-700"
-            )}
-            aria-live="polite"
-          >
-            {banner.msg}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Two columns on md+, stacked on mobile */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* LEFT: upload form */}
-        <form
-          onSubmit={handleUpload}
-          className="rounded-2xl border bg-white p-4 shadow-sm"
-        >
-          {/* kind tabs */}
-          <div className="mb-4 inline-flex rounded-full border p-1">
-            <button
-              type="button"
-              onClick={() => setTab("image")}
-              className={classNames(
-                "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm",
-                tab === "image" ? "bg-emerald-600 text-white" : "text-zinc-700 hover:bg-zinc-50"
-              )}
-              aria-pressed={tab === "image"}
+    <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-4">
+      <div className="rounded-2xl border bg-white p-3 sm:p-4 shadow-sm">
+        {/* top bar */}
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm transition hover:bg-zinc-50"
+              aria-label="Back to dashboard"
             >
-              <ImageIcon size={16} />
-              Image
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("video")}
-              className={classNames(
-                "ml-1 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm",
-                tab === "video" ? "bg-emerald-600 text-white" : "text-zinc-700 hover:bg-zinc-50"
-              )}
-              aria-pressed={tab === "video"}
-            >
-              <VideoIcon size={16} />
-              Video
-            </button>
+              <ArrowLeft size={14} />
+            </Link>
+            <h2 className="text-lg font-semibold">Notices</h2>
           </div>
 
-          {/* fields */}
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="text-xs text-zinc-600">Title (optional)</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
-                placeholder="e.g., Holiday on Friday"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-zinc-600">Body (optional)</label>
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
-                rows={3}
-                placeholder="Short description…"
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { loadRecent(); setActiveTab("recent"); }}
+              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
+              title="Refresh list"
+            >
+              <Upload size={14} />
+            </button>
+          </div>
+        </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="isLive"
-                type="checkbox"
-                checked={isLive}
-                onChange={(e) => setIsLive(e.target.checked)}
-              />
-              <label htmlFor="isLive" className="text-sm">
-                Publish immediately
-              </label>
-            </div>
+        {/* Tabs toggle: New notice | Recent */}
+        <div className="mb-3 flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("new")}
+            className={`rounded-full px-3 py-1 text-sm transition ${
+              activeTab === "new" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+            }`}
+            aria-pressed={activeTab === "new"}
+          >
+            New notice
+          </button>
 
-            {/* picker */}
-            <div>
-              <label className="text-xs text-zinc-600">
-                {tab === "image" ? "Pick an image" : "Pick a video"}
-              </label>
-              <div className="mt-1 flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border px-3 py-2 text-sm hover:bg-zinc-50">
-                  <Upload size={16} />
-                  Choose file
-                  <input
-                    type="file"
-                    accept={tab === "image" ? "image/*" : "video/*"}
-                    className="hidden"
-                    onChange={(e) => onChooseFile(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-                <span className="text-xs text-zinc-500 break-all">
-                  {file ? file.name : "No file chosen"}
-                </span>
-              </div>
-            </div>
+          <button
+            onClick={() => { setActiveTab("recent"); loadRecent(); }}
+            className={`rounded-full px-3 py-1 text-sm transition ${
+              activeTab === "recent" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+            }`}
+            aria-pressed={activeTab === "recent"}
+          >
+            Recent
+          </button>
+        </div>
 
-            {/* image cropper */}
-            {tab === "image" && imgUrl && (
-              <div className="relative mt-2 h-56 w-full overflow-hidden rounded-lg border">
-                <Cropper
-                  image={imgUrl}
-                  crop={crop}
-                  zoom={zoom}
-                  aspect={16 / 9}
-                  showGrid={false}
-                  onCropChange={setCrop}
-                  onZoomChange={setZoom}
-                  onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
-                />
-                <div className="absolute bottom-2 left-2 right-2">
-                  <input
-                    aria-label="Zoom"
-                    type="range"
-                    min={1}
-                    max={3}
-                    step={0.01}
-                    value={zoom}
-                    onChange={(e) => setZoom(Number(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            )}
+        {/* Banner */}
+        <AnimatePresence>
+          {banner && (
+            <motion.div
+              key={banner.msg}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className={classNames(
+                "mb-3 rounded-md px-3 py-2 text-sm",
+                banner.type === "success"
+                  ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border border-red-200 bg-red-50 text-red-700"
+              )}
+              aria-live="polite"
+            >
+              {banner.msg}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            {/* video preview */}
-            {tab === "video" && videoUrl && (
-              <div className="mt-2 space-y-2">
-                <video
-                  ref={videoRef}
-                  src={videoUrl}
-                  controls
-                  className="max-h-64 w-full rounded-lg border bg-black"
-                  onLoadedData={async () => {
-                    try {
-                      const poster = await captureVideoPoster();
-                      setPosterBlob(poster);
-                    } catch {
-                      /* ignore */
-                    }
-                  }}
-                />
-                <div className="flex flex-wrap items-center gap-2">
+        <div>
+          {/* NEW NOTICE FORM */}
+          <AnimatePresence initial={false} mode="wait">
+            {activeTab === "new" && (
+              <motion.form
+                key="new"
+                onSubmit={handleUpload}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="space-y-3"
+              >
+                {/* kind tabs */}
+                <div className="inline-flex rounded-full border p-1">
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        const p = await captureVideoPoster();
-                        setPosterBlob(p);
-                        setBanner({
-                          type: "success",
-                          msg: "Poster captured from current frame.",
-                        });
-                      } catch (e: any) {
-                        setBanner({
-                          type: "error",
-                          msg: e?.message || "Could not capture poster.",
-                        });
-                      }
-                    }}
-                    className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
+                    onClick={() => setTab("image")}
+                    className={classNames(
+                      "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm",
+                      tab === "image" ? "bg-emerald-600 text-white" : "text-zinc-700 hover:bg-zinc-50"
+                    )}
+                    aria-pressed={tab === "image"}
                   >
-                    Capture Poster
+                    <ImageIcon size={16} /> Image
                   </button>
-                  {posterBlob && (
-                    <span className="text-xs text-zinc-600">Poster ready</span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setTab("video")}
+                    className={classNames(
+                      "ml-1 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm",
+                      tab === "video" ? "bg-emerald-600 text-white" : "text-zinc-700 hover:bg-zinc-50"
+                    )}
+                    aria-pressed={tab === "video"}
+                  >
+                    <VideoIcon size={16} /> Video
+                  </button>
                 </div>
-              </div>
-            )}
-          </div>
 
-          <div className="mt-4 flex items-center justify-end">
-            <button
-              type="submit"
-              disabled={uploading || !file}
-              className="inline-flex items-center gap-2 rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-            >
-              <CheckCircle2 size={16} />
-              {uploading ? "Uploading…" : "Publish Notice"}
-            </button>
-          </div>
-        </form>
-
-        {/* RIGHT: recent list */}
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="mb-2 text-base font-semibold">Recent Notices</div>
-
-          <div className="space-y-2">
-            {loadingRecent ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="rounded-lg border p-3">
-                  <div className="h-3 w-32 animate-pulse rounded bg-zinc-200" />
-                  <div className="mt-2 h-3 w-20 animate-pulse rounded bg-zinc-200" />
-                </div>
-              ))
-            ) : top3.length === 0 ? (
-              <div className="rounded-lg border p-4 text-sm text-zinc-500">
-                No notices yet
-              </div>
-            ) : (
-              top3.map((n) => (
-                <div key={n.id} className="rounded-lg border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 text-sm font-medium truncate">
-                      {n.title || (n.kind === "image" ? "Image" : "Video")}
-                    </div>
-                    <span
-                      className={classNames(
-                        "shrink-0 rounded-full px-2 py-[2px] text-[10px] font-semibold",
-                        n.is_live
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-zinc-200 text-zinc-700"
-                      )}
-                    >
-                      {n.is_live ? "LIVE" : "Hidden"}
-                    </span>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="text-xs text-zinc-600">Title (optional)</label>
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
+                      placeholder="e.g., Holiday on Friday"
+                    />
                   </div>
-                  {n.body && (
-                    <div className="mt-1 text-xs text-zinc-600 break-words">
-                      {n.body}
-                    </div>
-                  )}
-                  <div className="mt-2 flex items-center justify-between text-xs text-zinc-500">
-                    <div className="truncate">
-                      {new Date(n.created_at).toLocaleString()}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {confirmDeleteId === n.id ? (
-                        <>
-                          <button
-                            className="rounded border px-2 py-1 hover:bg-zinc-50"
-                            onClick={() => setConfirmDeleteId(null)}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-red-700 hover:bg-red-100"
-                            onClick={() => doDelete(n.id)}
-                          >
-                            <Trash2 size={14} /> Delete
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-red-600 hover:bg-red-50"
-                          onClick={() => setConfirmDeleteId(n.id)}
-                        >
-                          <Trash2 size={14} /> Delete
-                        </button>
-                      )}
+
+                  <div>
+                    <label className="text-xs text-zinc-600">Body (optional)</label>
+                    <textarea
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-emerald-300"
+                      rows={3}
+                      placeholder="Short description…"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="isLive"
+                      type="checkbox"
+                      checked={isLive}
+                      onChange={(e) => setIsLive(e.target.checked)}
+                    />
+                    <label htmlFor="isLive" className="text-sm">Publish immediately</label>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-zinc-600">
+                      {tab === "image" ? "Pick an image" : "Pick a video"}
+                    </label>
+                    <div className="mt-1 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border px-3 py-2 text-sm hover:bg-zinc-50">
+                        <Upload size={16} /> Choose file
+                        <input
+                          type="file"
+                          accept={tab === "image" ? "image/*" : "video/*"}
+                          className="hidden"
+                          onChange={(e) => onChooseFile(e.target.files?.[0] ?? null)}
+                        />
+                      </label>
+                      <span className="text-xs text-zinc-500 break-all">{file ? file.name : "No file chosen"}</span>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
 
-            {/* Older (accordion) */}
-            {older.length > 0 && (
-              <div className="rounded-xl border overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowOlder((v) => !v)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-sm"
-                  aria-expanded={showOlder}
-                >
-                  <span>Older</span>
-                  {showOlder ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-                <AnimatePresence initial={false}>
-                  {showOlder && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="px-2 pb-2"
-                    >
-                      <div className="space-y-2">
-                        {older.map((n) => (
-                          <div key={n.id} className="rounded-lg border p-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0 text-sm font-medium truncate">
-                                {n.title || (n.kind === "image" ? "Image" : "Video")}
-                              </div>
-                              <span
-                                className={classNames(
-                                  "shrink-0 rounded-full px-2 py-[2px] text-[10px] font-semibold",
-                                  n.is_live
-                                    ? "bg-emerald-100 text-emerald-700"
-                                    : "bg-zinc-200 text-zinc-700"
-                                )}
-                              >
-                                {n.is_live ? "LIVE" : "Hidden"}
-                              </span>
-                            </div>
-                            {n.body && (
-                              <div className="mt-1 text-xs text-zinc-600 break-words">
-                                {n.body}
-                              </div>
-                            )}
-                            <div className="mt-2 flex items-center justify-between text-xs text-zinc-500">
-                              <div className="truncate">
-                                {new Date(n.created_at).toLocaleString()}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {confirmDeleteId === n.id ? (
-                                  <>
-                                    <button
-                                      className="rounded border px-2 py-1 hover:bg-zinc-50"
-                                      onClick={() => setConfirmDeleteId(null)}
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-red-700 hover:bg-red-100"
-                                      onClick={() => doDelete(n.id)}
-                                    >
-                                      <Trash2 size={14} /> Delete
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    className="inline-flex items-center gap-1 rounded border px-2 py-1 text-red-600 hover:bg-red-50"
-                                    onClick={() => setConfirmDeleteId(n.id)}
-                                  >
-                                    <Trash2 size={14} /> Delete
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                  {/* image cropper */}
+                  {tab === "image" && imgUrl && (
+                    <div className="relative mt-2 h-56 w-full overflow-hidden rounded-lg border">
+                      <Cropper
+                        image={imgUrl}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={16 / 9}
+                        showGrid={false}
+                        onCropChange={setCrop}
+                        onZoomChange={setZoom}
+                        onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
+                      />
+                      <div className="absolute bottom-2 left-2 right-2">
+                        <input
+                          aria-label="Zoom"
+                          type="range"
+                          min={1}
+                          max={3}
+                          step={0.01}
+                          value={zoom}
+                          onChange={(e) => setZoom(Number(e.target.value))}
+                          className="w-full"
+                        />
                       </div>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
-              </div>
+
+                  {/* video preview */}
+                  {tab === "video" && videoUrl && (
+                    <div className="mt-2 space-y-2">
+                      <video
+                        ref={videoRef}
+                        src={videoUrl}
+                        controls
+                        className="max-h-64 w-full rounded-lg border bg-black"
+                        onLoadedData={async () => {
+                          try {
+                            const poster = await captureVideoPoster();
+                            setPosterBlob(poster);
+                          } catch {
+                            /* ignore */
+                          }
+                        }}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const p = await captureVideoPoster();
+                              setPosterBlob(p);
+                              setBanner({ type: "success", msg: "Poster captured from current frame." });
+                            } catch (e: any) {
+                              setBanner({ type: "error", msg: e?.message || "Could not capture poster." });
+                            }
+                          }}
+                          className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
+                        >
+                          Capture Poster
+                        </button>
+                        {posterBlob && <span className="text-xs text-zinc-600">Poster ready</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 flex items-center justify-end">
+                  <button
+                    type="submit"
+                    disabled={uploading || !file}
+                    className="inline-flex items-center gap-2 rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    <CheckCircle2 size={16} /> {uploading ? "Uploading…" : "Publish Notice"}
+                  </button>
+                </div>
+              </motion.form>
             )}
-          </div>
+          </AnimatePresence>
+
+          {/* RECENT LIST */}
+          <AnimatePresence initial={false} mode="wait">
+            {activeTab === "recent" && (
+              <motion.div
+                key="recent"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="space-y-3"
+              >
+                <div className="text-base font-semibold">Recent Notices</div>
+
+                <div className="space-y-2">
+                  {loadingRecent ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="rounded-lg border p-3">
+                        <div className="h-3 w-32 animate-pulse rounded bg-zinc-200" />
+                        <div className="mt-2 h-3 w-20 animate-pulse rounded bg-zinc-200" />
+                      </div>
+                    ))
+                  ) : top3.length === 0 ? (
+                    <div className="rounded-lg border p-4 text-sm text-zinc-500">No notices yet</div>
+                  ) : (
+                    top3.map((n) => (
+                      <div key={n.id} className="rounded-lg border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 text-sm font-medium truncate">{n.title || (n.kind === "image" ? "Image" : "Video")}</div>
+                          <span className={classNames(
+                            "shrink-0 rounded-full px-2 py-[2px] text-[10px] font-semibold",
+                            n.is_live ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"
+                          )}>
+                            {n.is_live ? "LIVE" : "Hidden"}
+                          </span>
+                        </div>
+
+                        {n.body && <div className="mt-1 text-xs text-zinc-600 break-words">{n.body}</div>}
+
+                        <div className="mt-2 flex items-center justify-between text-xs text-zinc-500">
+                          <div className="truncate">{new Date(n.created_at).toLocaleString()}</div>
+                          <div className="flex items-center gap-2">
+                            {confirmDeleteId === n.id ? (
+                              <>
+                                <button className="rounded border px-2 py-1 hover:bg-zinc-50" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                                <button className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-red-700 hover:bg-red-100" onClick={() => doDelete(n.id)}>
+                                  <Trash2 size={14} /> Delete
+                                </button>
+                              </>
+                            ) : (
+                              <button className="inline-flex items-center gap-1 rounded border px-2 py-1 text-red-600 hover:bg-red-50" onClick={() => setConfirmDeleteId(n.id)}>
+                                <Trash2 size={14} /> Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                  {/* Older (accordion) */}
+                  {older.length > 0 && (
+                    <div className="rounded-xl border overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setShowOlder((v) => !v)}
+                        className="flex w-full items-center justify-between px-3 py-2 text-sm"
+                        aria-expanded={showOlder}
+                      >
+                        <span>Older</span>
+                        {showOlder ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {showOlder && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="px-2 pb-2"
+                          >
+                            <div className="space-y-2">
+                              {older.map((n) => (
+                                <div key={n.id} className="rounded-lg border p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0 text-sm font-medium truncate">{n.title || (n.kind === "image" ? "Image" : "Video")}</div>
+                                    <span className={classNames(
+                                      "shrink-0 rounded-full px-2 py-[2px] text-[10px] font-semibold",
+                                      n.is_live ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"
+                                    )}>{n.is_live ? "LIVE" : "Hidden"}</span>
+                                  </div>
+
+                                  {n.body && <div className="mt-1 text-xs text-zinc-600 break-words">{n.body}</div>}
+
+                                  <div className="mt-2 flex items-center justify-between text-xs text-zinc-500">
+                                    <div className="truncate">{new Date(n.created_at).toLocaleString()}</div>
+                                    <div className="flex items-center gap-2">
+                                      {confirmDeleteId === n.id ? (
+                                        <>
+                                          <button className="rounded border px-2 py-1 hover:bg-zinc-50" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                                          <button className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-red-700 hover:bg-red-100" onClick={() => doDelete(n.id)}>
+                                            <Trash2 size={14} /> Delete
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <button className="inline-flex items-center gap-1 rounded border px-2 py-1 text-red-600 hover:bg-red-50" onClick={() => setConfirmDeleteId(n.id)}>
+                                          <Trash2 size={14} /> Delete
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

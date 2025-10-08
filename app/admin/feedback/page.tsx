@@ -25,7 +25,7 @@ function formatWhen(iso: string) {
   }
 }
 
-/* ---------- Small confirm dialog (no browser confirm) ---------- */
+/* ---------- Small confirm dialog (keeps original logic) ---------- */
 function ConfirmDialog({
   open,
   title,
@@ -47,9 +47,7 @@ function ConfirmDialog({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[140] bg-black/50 p-4
-                   pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
-                   pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+        className="fixed inset-0 z-[140] bg-black/50 p-3"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -59,26 +57,26 @@ function ConfirmDialog({
         aria-label={title}
       >
         <motion.div
-          className="mx-auto mt-24 w-full max-w-md rounded-2xl bg-white p-4 shadow-xl"
-          initial={{ y: 18, opacity: 0 }}
+          className="mx-auto mt-20 w-full max-w-md rounded-xl bg-white p-3 shadow"
+          initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 18, opacity: 0 }}
+          exit={{ y: 12, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="text-base font-semibold">{title}</div>
-          {message && <p className="mt-1 text-sm text-zinc-600">{message}</p>}
+          <div className="text-sm font-semibold">{title}</div>
+          {message && <p className="mt-1 text-xs text-zinc-600">{message}</p>}
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
               onClick={onCancel}
               disabled={busy}
-              className="h-10 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-60"
+              className="h-8 rounded border px-2 py-0.5 text-xs hover:bg-zinc-50 disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
               disabled={busy}
-              className={`h-10 rounded px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-60 ${
+              className={`h-8 rounded px-2.5 py-0.5 text-xs font-medium text-white disabled:opacity-60 ${
                 danger ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"
               }`}
             >
@@ -89,6 +87,38 @@ function ConfirmDialog({
       </motion.div>
     </AnimatePresence>
   );
+}
+
+/* ---------- Robust fetch helper (handles empty/non-json responses) ---------- */
+async function fetchJSON(url: string, init?: RequestInit) {
+  const res = await fetch(url, init);
+  const contentType = res.headers.get("content-type") || "";
+  const status = res.status;
+
+  // read as text first
+  const txt = await res.text().catch(() => "");
+
+  if (!res.ok) {
+    const snippet = txt ? ` - ${txt.slice(0, 1024)}` : "";
+    throw new Error(`Request failed (${status})${snippet}`);
+  }
+
+  if (!txt) return {}; // empty body -> return empty object
+
+  if (contentType.includes("application/json") || contentType.includes("application/ld+json")) {
+    try {
+      return JSON.parse(txt);
+    } catch (e) {
+      throw new Error(`Invalid JSON (${status}) - ${(e as Error).message}: ${txt.slice(0, 1024)}`);
+    }
+  }
+
+  // fallback: try JSON.parse, otherwise return raw text
+  try {
+    return JSON.parse(txt);
+  } catch {
+    return txt;
+  }
 }
 
 export default function AdminFeedbackPage() {
@@ -112,23 +142,18 @@ export default function AdminFeedbackPage() {
   const [deleting, setDeleting] = useState(false);
 
   // -------- load ----------
-  async function fetchJSON(url: string, init?: RequestInit) {
-    const r = await fetch(url, init);
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data?.error || "Request failed");
-    return data;
-  }
-
   async function load() {
     setLoading(true);
     setErr(null);
     try {
       let data: Feedback[] = [];
       try {
-        data = await fetchJSON(ADMIN_BASE);
+        data = (await fetchJSON(ADMIN_BASE)) as Feedback[];
       } catch {
-        data = await fetchJSON(PUBLIC_BASE);
+        // fallback to public if admin endpoint fails
+        data = (await fetchJSON(PUBLIC_BASE)) as Feedback[];
       }
+      data = Array.isArray(data) ? data : [];
       data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setItems(data);
     } catch (e: any) {
@@ -209,27 +234,30 @@ export default function AdminFeedbackPage() {
   }
 
   return (
-    <div className="safe-x mx-auto w-full max-w-5xl px-3 sm:px-4 lg:px-6 py-4">
-      {/* Top bar with Back to Dashboard */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <div className="safe-x mx-auto w-full max-w-3xl px-3 py-4">
+      {/* compact header */}
+      <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            className="inline-flex items-center gap-2 rounded border px-2 py-1 text-xs hover:bg-zinc-50"
           >
-            ← Back to Dashboard
+            ← Back
           </Link>
-          <h2 className="text-lg sm:text-xl font-semibold truncate">Parent Feedback</h2>
+          <h2 className="text-sm font-semibold truncate">Parent Feedback</h2>
         </div>
-        <button
-          onClick={load}
-          className="h-10 rounded border px-3 py-1.5 text-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => load()}
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-zinc-50"
+            title="Refresh"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
-      {/* Inline banner messages */}
+      {/* Inline banner */}
       <AnimatePresence>
         {banner && (
           <motion.div
@@ -237,7 +265,7 @@ export default function AdminFeedbackPage() {
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className={`mb-3 rounded-md px-3 py-2 text-sm shadow-sm ${
+            className={`mb-3 rounded-md px-2 py-2 text-xs ${
               banner.type === "success"
                 ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border border-red-200 bg-red-50 text-red-700"
@@ -250,16 +278,16 @@ export default function AdminFeedbackPage() {
       </AnimatePresence>
 
       {err && (
-        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-2 py-2 text-xs text-red-700">
           {err}
         </div>
       )}
 
-      {/* Top: Older feedback dropdown */}
-      <div className="mb-3 flex flex-col sm:flex-row items-start sm:items-center gap-2">
-        <label className="text-sm text-zinc-600 shrink-0">Older feedback:</label>
+      {/* Top: Older feedback dropdown (compact) */}
+      <div className="mb-3 flex flex-col sm:flex-row items-start sm:items-center gap-2 text-xs">
+        <label className="text-zinc-600 shrink-0">Older:</label>
         <select
-          className="w-full sm:w-auto min-w-[240px] sm:min-w-[260px] rounded border border-zinc-300 bg-white px-2 py-2 text-sm"
+          className="w-full sm:w-auto min-w-[180px] rounded border border-zinc-300 bg-white px-2 py-1 text-xs"
           onChange={(e) => {
             const id = e.target.value;
             const item = items.find((x) => x.id === id) || null;
@@ -271,27 +299,25 @@ export default function AdminFeedbackPage() {
           <option value="">Select to view…</option>
           {older.map((f) => (
             <option key={f.id} value={f.id}>
-              {`${f.student_name} (${f.parent_name}) — ${new Date(f.created_at).toLocaleString()}`}
+              {`${f.student_name} (${f.parent_name}) — ${new Date(f.created_at).toLocaleDateString()}`}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Latest 5 list (single-line rows) */}
-      <div className="rounded-2xl border bg-white overflow-hidden">
-        <div className="sticky top-0 z-10 border-b bg-zinc-50/70 px-3 py-2 text-sm text-zinc-600 backdrop-blur">
-          Latest 5 — click a row to view full
-        </div>
+      {/* Latest 5 list (compact vertical card) */}
+      <div className="rounded-xl border bg-white overflow-hidden">
+        <div className="px-3 py-2 text-xs text-zinc-600 border-b">Latest 5 — click to view</div>
 
-        <div className="max-h-[60vh] sm:max-h-[360px] overflow-y-auto">
+        <div className="max-h-[62vh] overflow-y-auto">
           {loading ? (
-            <div className="space-y-2 p-3">
+            <div className="p-3 space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-12 animate-pulse rounded border bg-zinc-100" />
+                <div key={i} className="h-10 animate-pulse rounded bg-zinc-100" />
               ))}
             </div>
           ) : latest5.length === 0 ? (
-            <div className="p-6 text-center text-sm text-zinc-500">No feedback yet.</div>
+            <div className="p-4 text-xs text-zinc-500">No feedback yet.</div>
           ) : (
             <ul className="divide-y">
               {latest5.map((f) => (
@@ -300,26 +326,25 @@ export default function AdminFeedbackPage() {
                   className="cursor-pointer px-3 py-3 hover:bg-zinc-50"
                   onClick={() => setOpenItem(f)}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 truncate">
-                      <span className="font-medium">{f.student_name}</span>{" "}
-                      <span className="text-zinc-500">({f.parent_name}) — </span>
-                      <span className="text-zinc-700">
-                        {f.comment.replace(/\s+/g, " ").slice(0, 60)}
-                        {f.comment.length > 60 ? "…" : ""}
-                      </span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium leading-tight truncate">{f.student_name}</div>
+                      <div className="mt-0.5 text-xs text-zinc-500 truncate">
+                        {f.parent_name} — {f.comment.replace(/\s+/g, " ").slice(0, 80)}
+                        {f.comment.length > 80 ? "…" : ""}
+                      </div>
                     </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      <span className="text-[11px] text-zinc-500">
+                    <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                      <div className="text-[11px] text-zinc-500">
                         {new Date(f.created_at).toLocaleDateString()}
-                      </span>
-                      <span
+                      </div>
+                      <div
                         className={`rounded-full px-2 py-[2px] text-[10px] ${
                           f.read ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                         }`}
                       >
                         {f.read ? "READ" : "NEW"}
-                      </span>
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -329,13 +354,11 @@ export default function AdminFeedbackPage() {
         </div>
       </div>
 
-      {/* Viewer modal */}
+      {/* Viewer modal (compact) */}
       <AnimatePresence>
         {openItem && (
           <motion.div
-            className="fixed inset-0 z-[120] bg-black/50 p-4
-                       pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
-                       pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+            className="fixed inset-0 z-[120] bg-black/50 p-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -345,30 +368,30 @@ export default function AdminFeedbackPage() {
             aria-label="Feedback details"
           >
             <motion.div
-              className="mx-auto mt-16 w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl"
-              initial={{ y: 20, opacity: 0 }}
+              className="mx-auto mt-16 w-full max-w-xl rounded-xl bg-white p-3 shadow"
+              initial={{ y: 16, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
+              exit={{ y: 16, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-base font-semibold">
+                  <div className="text-sm font-semibold">
                     {openItem.student_name}{" "}
-                    <span className="font-normal text-zinc-500">({openItem.parent_name})</span>
+                    <span className="font-normal text-zinc-500 text-xs">({openItem.parent_name})</span>
                   </div>
                   <div className="mt-1 text-xs text-zinc-500">{formatWhen(openItem.created_at)}</div>
                 </div>
-                <div className="shrink-0 space-x-2">
+                <div className="shrink-0 flex items-center gap-2">
                   <button
                     onClick={() => setRead(openItem.id, !openItem.read)}
-                    className="h-9 rounded border px-2 py-1 text-xs hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    className="h-8 rounded border px-2 text-xs hover:bg-zinc-50"
                   >
                     {openItem.read ? "Mark Unread" : "Mark Read"}
                   </button>
                   <button
                     onClick={() => askDelete(openItem)}
-                    className="h-9 rounded border px-2 py-1 text-xs text-red-600 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    className="h-8 rounded border px-2 text-xs text-red-600 hover:bg-red-50"
                   >
                     Delete
                   </button>
@@ -377,7 +400,7 @@ export default function AdminFeedbackPage() {
 
               <div
                 className="rounded-md border bg-zinc-50 p-3 text-sm leading-relaxed text-zinc-800
-                           whitespace-pre-wrap break-words max-h-[50vh] sm:max-h-72 overflow-y-auto overflow-x-hidden"
+                           whitespace-pre-wrap break-words max-h-[50vh] overflow-y-auto"
               >
                 {openItem.comment}
               </div>
@@ -385,7 +408,7 @@ export default function AdminFeedbackPage() {
               <div className="mt-3 flex items-center justify-end">
                 <button
                   onClick={() => setOpenItem(null)}
-                  className="h-10 rounded-md px-3 py-1.5 text-sm hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  className="h-9 rounded px-3 text-sm hover:bg-zinc-50"
                 >
                   Close
                 </button>

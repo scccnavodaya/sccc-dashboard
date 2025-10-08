@@ -2,7 +2,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type StatsResponse = {
   studentsTotal: number;
@@ -11,9 +11,18 @@ export type StatsResponse = {
   noticesLive: number;
 };
 
-// Abortable SWR fetcher (SWR v2 passes { signal })
-async function fetcher(key: string, { signal }: { signal?: AbortSignal }) {
+/**
+ * Abortable SWR fetcher.
+ * Accepts the second parameter optionally because SWR may call the fetcher
+ * with no second argument in some edge cases.
+ */
+async function fetcher(
+  key: string,
+  opts?: { signal?: AbortSignal } // <-- make optional to avoid destructure errors
+) {
+  const signal = opts?.signal;
   const res = await fetch(key, { cache: "no-store", signal });
+
   let data: any = {};
   try {
     data = await res.json();
