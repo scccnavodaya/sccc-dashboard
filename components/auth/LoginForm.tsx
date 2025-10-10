@@ -1,7 +1,5 @@
-// components/auth/LoginForm.tsx
 "use client";
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { passwordStrengthLabel, passwordStrengthScore } from "./strength";
 
@@ -9,8 +7,6 @@ export default function LoginForm({
   onSuccess,
   onForgot,
 }: { onSuccess?: () => void; onForgot: () => void }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -20,7 +16,11 @@ export default function LoginForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (!username || !password) { setErr("Enter username and password"); return; }
+
+    if (!username || !password) {
+      setErr("Enter username and password");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -30,12 +30,15 @@ export default function LoginForm({
         body: JSON.stringify({ username, password }),
         credentials: "include",
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(data?.error || "Login failed"); return; }
 
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(data?.error || "Login failed");
+        return;
+      }
+
+      // ✅ Only signal success; AdminScreen handles navigation
       onSuccess?.();
-      const next = searchParams.get("next");
-      router.push(next || "/admin");
     } catch (e: any) {
       setErr(e?.message || "Network error");
     } finally {
@@ -48,7 +51,11 @@ export default function LoginForm({
   const label = hasTyped ? passwordStrengthLabel(score) : "";
 
   return (
-    <form onSubmit={submit} className="space-y-4 sm:space-y-5 w-full max-w-md mx-auto px-4 sm:px-0">
+    <form
+      onSubmit={submit}
+      className="space-y-4 sm:space-y-5 w-full max-w-md mx-auto px-4 sm:px-0"
+    >
+      {/* Username Field */}
       <div>
         <label className="text-sm sm:text-[0.95rem] text-zinc-600">Username</label>
         <input
@@ -64,6 +71,7 @@ export default function LoginForm({
         />
       </div>
 
+      {/* Password Field */}
       <div>
         <label className="text-sm sm:text-[0.95rem] text-zinc-600">Password</label>
         <div className="mt-1 flex items-stretch">
@@ -87,7 +95,7 @@ export default function LoginForm({
           </button>
         </div>
 
-        {/* Strength meter: only show AFTER typing */}
+        {/* Strength Meter */}
         {hasTyped && (
           <div className="mt-2 flex items-center gap-2">
             <div className="h-1 w-full rounded bg-zinc-200 overflow-hidden">
@@ -110,6 +118,7 @@ export default function LoginForm({
         {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
       </div>
 
+      {/* Buttons */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
         <button
           type="submit"

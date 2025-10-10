@@ -1,66 +1,45 @@
-// app/admin/page.tsx
 "use client";
 
-import React, { useState } from "react";
-import AdminDrawer from "@/components/AdminDrawer";
-import AdminCardLayout from "@/components/AdminCardLayout";
-import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { motion } from "framer-motion";
 
-/**
- * Admin home card that uses the in-card AdminDrawer with wrapped hamburger.
- */
-export default function AdminHomeCard() {
-  const [expanded, setExpanded] = useState(false);
-  const router = useRouter();
-
-  async function doLogout() {
-    try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch {
-      // ignore
-    } finally {
-      router.push("/");
-    }
-  }
-
+export default function AdminHomePage() {
   return (
-    <AdminCardLayout>
-      {/* in-card drawer: hamburger is the wrapped control */}
-      <AdminDrawer expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
-
-      {/* top row: keep an explicit logout on right (hamburger is inside drawer component) */}
-      <div className="w-full flex items-start justify-end">
-        <button
-          onClick={doLogout}
-          aria-label="Logout"
-          className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
-          title="Logout"
-        >
-          Logout
-        </button>
-      </div>
-
-      {/* center content */}
-      <div className="w-full text-center mt-2">
-        <div className="mx-auto h-20 w-20 rounded-full overflow-hidden border-2 border-emerald-400 shadow-inner">
-          <img src="/logo.jpeg" alt="Coaching Logo" className="h-full w-full object-contain" draggable={false} />
+    <div className="px-2 py-2">
+      <div className="mx-auto w-full max-w-sm rounded-2xl border bg-white p-3 text-center shadow-sm">
+        <div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-emerald-400 shadow-inner">
+          {/* Fit fully, no cropping beyond its circle frame */}
+          <Image
+            src="/logo.jpeg"
+            alt="Coaching Logo"
+            width={160}
+            height={160}
+            className="h-full w-full object-contain"
+            priority
+            draggable={false}
+          />
         </div>
 
-        <h1 className="mt-3 text-base font-bold text-emerald-800 leading-tight text-center">
+        <motion.h1
+          className="mt-2 text-[14px] font-bold leading-tight text-emerald-800"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18 }}
+        >
           Success Career Coaching Centre
-        </h1>
+        </motion.h1>
 
-        <p className="text-[11px] text-zinc-600 leading-snug mt-1 text-center">
+        <p className="mt-1 text-[11px] leading-snug text-zinc-600">
           Moirang Phiwangbam Leikai, Bishnupur District, Manipur
         </p>
-      </div>
 
-      {/* footer credit */}
-      <div className="mt-3 text-center border-t border-zinc-100 pt-2 w-full">
-        <p className="text-[10px] text-zinc-500 leading-tight">
-          Designed &amp; Developed by <span className="font-medium text-emerald-700">Karam Suresh</span>
-        </p>
+        <div className="mt-3 border-t border-zinc-100 pt-2">
+          <p className="text-[10.5px] leading-tight text-zinc-500">
+            Designed &amp; Developed by{" "}
+            <span className="font-medium text-emerald-700">Karam Suresh</span>
+          </p>
+        </div>
       </div>
-    </AdminCardLayout>
+    </div>
   );
 }

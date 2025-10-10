@@ -11,25 +11,33 @@
 @tailwind utilities;
 
 /* ------------------------------------------------
-   FIXED: App-level sizing (prevents outer scrollbar)
-   Make the page full height and stop page-level vertical scrolling.
-   Use an inner scroll container for any content that needs to scroll.
+   Root variables (easy knobs)
+-------------------------------------------------- */
+:root {
+  --app-scale: 0.6;     /* for public views if you use them */
+
+  /* Admin card “phone” geometry + internal scale */
+  --phone-w: 360px;     /* 340–390px works well */
+  --phone-h: 740px;     /* tall feel; card can be shorter if content is less */
+  --adm-scale: 0.55;    /* 0.50–0.60 */
+}
+
+/* ------------------------------------------------
+   App-level sizing (no body scroll)
 -------------------------------------------------- */
 html, body, #__next {
   height: 100%;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  /* hide outer vertical scroll — inner content should scroll */
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: hidden;            /* page doesn't scroll; inner admin does */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
 }
 
-/* Inner scroll utility: use this on the element that should scroll
-   instead of allowing the body to scroll. Example: .app-card > .inner-scroll */
+/* Inner scroll utility */
 .inner-scroll {
   height: 100%;
   overflow-y: auto;
@@ -37,7 +45,7 @@ html, body, #__next {
 }
 
 /* ------------------------------------------------
-   Base (copied from original with minor safety tweaks)
+   Base
 -------------------------------------------------- */
 html, body {
   font-family: 'Poppins', sans-serif;
@@ -70,7 +78,7 @@ img, video, canvas, svg {
 /* Prevent flex children from overflowing */
 * { min-width: 0; }
 
-/* Better containment */
+/* Better containment for safe areas */
 .mobile-rescue {
   width: 100%;
   overflow-x: hidden;
@@ -80,7 +88,7 @@ img, video, canvas, svg {
 }
 
 /* ------------------------------------------------
-   Desktop wrappers
+   Public wrappers (unchanged behavior)
 -------------------------------------------------- */
 .app-viewport, .admin-viewport {
   width: 100vw;
@@ -94,32 +102,26 @@ img, video, canvas, svg {
   width: 1200px;
   margin: 0 auto;
   transform-origin: top center;
+  transform: scale(var(--app-scale));
+  will-change: transform;
 }
 
-/* Fluid below 1200px */
 @media (max-width: 1200px) {
   .app-canvas, .admin-canvas {
     width: 100%;
-    transform: none;
+    transform: scale(var(--app-scale));
     min-height: auto;
     padding-left: 12px;
     padding-right: 12px;
   }
 }
 
-/* Slight scale up for large screens */
-@media (min-width: 1600px) {
-  .app-canvas, .admin-canvas { transform: scale(1.05); }
-}
-@media (min-width: 1920px) {
-  .app-canvas, .admin-canvas { transform: scale(1.12); }
-}
+@media (min-width: 1600px) { .app-canvas, .admin-canvas { transform: scale(calc(var(--app-scale) * 1.05)); } }
+@media (min-width: 1920px) { .app-canvas, .admin-canvas { transform: scale(calc(var(--app-scale) * 1.12)); } }
 
 /* ------------------------------------------------
-   One-pass mobile fixes (no JSX change required)
+   One-pass mobile fixes
 -------------------------------------------------- */
-
-/* 1) Auto-fix tables (removed min-width 720px) */
 @media (max-width: 768px) {
   .rounded-2xl:has(table),
   .card:has(table),
@@ -136,7 +138,7 @@ img, video, canvas, svg {
   }
 }
 
-/* 2) Sticky headers / table heads */
+/* sticky helpers */
 .sticky-top,
 thead.sticky,
 thead.sticky-top,
@@ -145,464 +147,241 @@ thead.sticky-top,
   top: 0;
   z-index: 10;
   backdrop-filter: saturate(1.2) blur(2px);
+  transform: translateZ(0);
 }
 
-/* 3) Card shell containment */
-.card,
-.rounded-2xl { overflow: hidden; }
+/* card containment */
+.card, .rounded-2xl { overflow: hidden; }
 
-/* 4) Explicit table scroller */
-.table-scroll {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
+/* explicit table scroller */
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-scroll > table { min-width: unset; width: 100%; }
 
 /* ------------------------------------------------
    Responsive helpers
 -------------------------------------------------- */
-.soft-shadow {
-  box-shadow: 0 6px 24px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
-}
-
+.soft-shadow { box-shadow: 0 6px 24px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04); }
 .stack-sm > * + * { margin-top: 0.5rem; }
-
 .no-shrink { flex-shrink: 0; }
+.break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
 
-.break-anywhere {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-/* Comfortable tap targets */
 @media (max-width: 640px) {
-  input[type="text"],
-  input[type="date"],
-  input[type="number"],
-  input[type="month"],
-  input[type="password"],
-  select,
-  textarea,
-  button {
+  input[type="text"], input[type="date"], input[type="number"],
+  input[type="month"], input[type="password"], select, textarea, button {
     min-height: 40px;
   }
   button, .btn { touch-action: manipulation; }
 }
 
-/* Compact tables */
 @media (max-width: 640px) {
   table th, table td { padding: 0.45rem 0.5rem; }
 }
 
-/* Thin progress bars */
-.progress-thin {
-  height: 4px;
-  width: 100%;
-  overflow: hidden;
-  border-radius: 9999px;
-}
+.progress-thin { height: 4px; width: 100%; overflow: hidden; border-radius: 9999px; }
 
-/* Line clamps */
 .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-.grid-wide { min-width: 980px; }
-
-.avatar {
-  border-radius: 9999px;
-  object-fit: cover;
-  object-position: center;
-}
-
 /* ------------------------------------------------
    Safe area padding
 -------------------------------------------------- */
-.safe-x {
-  padding-left: env(safe-area-inset-left, 0);
-  padding-right: env(safe-area-inset-right, 0);
-}
-.safe-y {
-  padding-top: env(safe-area-inset-top, 0);
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
+.safe-x { padding-left: env(safe-area-inset-left, 0); padding-right: env(safe-area-inset-right, 0); }
+.safe-y { padding-top: env(safe-area-inset-top, 0); padding-bottom: env(safe-area-inset-bottom, 0); }
 
 /* ------------------------------------------------
-   Layout utilities
+   Public card
 -------------------------------------------------- */
-.grid-safe { gap: clamp(0.5rem, 2vw, 1rem); }
-
-.stat-value {
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-}
-
-/* Sticky header/footer */
-.app-header,
-.app-footer {
-  position: sticky;
-  z-index: 30;
-  backdrop-filter: saturate(1.05) blur(2px);
-}
-.app-header { top: 0; }
-.app-footer { bottom: 0; }
-
-/* If duplicate footers accidentally exist, hide all but the last one.
-   This is defensive: you should still remove duplicate markup when possible. */
-.app-footer:not(:last-child) {
-  display: none !important;
-}
-
-/* motion container */
-.motion-container {
-  transform: translateZ(0);
-  will-change: transform, opacity;
-}
-
-/* ------------------------------------------------
-   Dynamic header spacer + notice clamp
--------------------------------------------------- */
-.header-spacer {
-  height: var(--header-h, 72px); /* reduced default header space */
-}
-
-.notice-card-inner {
-  overflow: hidden;
-}
-
-/* ------------------------------------------------
-   Compact / mobile adjustments (70% scale + sizing)
-   These rules target the public page to make it compact
--------------------------------------------------- */
-
-/* Global mobile-scale wrapper — set this in your page root */
-@media (max-width: 640px) {
-  .mobile-scale {
-    transform-origin: top center;
-    transform: scale(0.7);    /* requested 70% scale on small devices */
-    width: 100%;
-    margin: 0 auto;
-    -webkit-transform-origin: top center;
-    -webkit-transform: scale(0.7);
-    /* Ensure content doesn't get hidden below the bottom nav: add safe padding */
-    padding-bottom: calc(78px + env(safe-area-inset-bottom));
-  }
-
-  /* reduce overall page paddings for compactness */
-  .mobile-scale .mx-auto,
-  .mobile-scale .px-3,
-  .mobile-scale .px-2 {
-    padding-left: 6px !important;
-    padding-right: 6px !important;
-  }
-
-  /* reduce header spacer extra vertical gap */
-  .header-spacer { height: var(--header-h, 56px); }
-
-  /* tighten StatCards vertical padding & font sizes */
-  .rounded-2xl.border.bg-white.p-3 {
-    padding: 10px !important;
-  }
-  .rounded-2xl.border.bg-white.p-3 .stat-value {
-    font-size: 20px !important;
-  }
-  .rounded-2xl.border.bg-white.p-3 .text-sm {
-    font-size: 12px !important;
-  }
-
-  /* Ticker / latest small font and height */
-  header .ticker,
-  header .min-w-0 > div {
-    font-size: 12px !important;
-    line-height: 1.1 !important;
-  }
-
-  /* Constrain leaderboard and notice: same heights + scroll after ~4 rows */
-  /* these selectors target Tailwind-generated classes like max-h-[220px] */
-  [class*="max-h-[220px]"], [class*="max-h-\\[220px\\]"] {
-    max-height: 220px !important;
-  }
-  [class*="max-h-[420px]"], [class*="max-h-\\[420px\\]"] {
-    max-height: 420px !important;
-  }
-
-  /* When we wrap the leaderboard in an overflow-y area, make scrollbars slim */
-  .max-h-[220px], .max-h-\\[220px\\] {
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch;
-  }
-  .max-h-[220px]::-webkit-scrollbar,
-  .max-h-\\[220px\\]::-webkit-scrollbar {
-    width: 9px;
-  }
-  .max-h-[220px]::-webkit-scrollbar-thumb,
-  .max-h-\\[220px\\]::-webkit-scrollbar-thumb {
-    background: rgba(0,0,0,0.12);
-    border-radius: 8px;
-  }
-
-  /* NoticeCarousel inner area small padding */
-  .notice-card-inner, .rounded-2xl.notice {
-    padding: 6px !important;
-  }
-
-  /* Reduce carousel dot/pip sizes */
-  .carousel-dots, .slick-dots {
-    transform: scale(0.9);
-  }
-
-  /* compact leaderboard rows (assumes default table row heights) */
-  .rounded-2xl:has(table) table tbody tr td,
-  .rounded-2xl:has(table) table tbody tr th {
-    padding-top: 0.4rem !important;
-    padding-bottom: 0.4rem !important;
-  }
-
-  /* avoid huge whitespace between header/ticker and content */
-  .mobile-rescue { padding-top: 0 !important; }
-
-  /* small-screen specific: make fonts slightly smaller globally inside scaled area */
-  .mobile-scale, .mobile-scale * {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-}
-
-/* Slightly larger phones (between 641px and 900px) — milder scale */
-@media (min-width: 641px) and (max-width: 900px) {
-  .mobile-scale {
-    transform-origin: top center;
-    transform: scale(0.85);
-    width: 100%;
-    padding-bottom: calc(78px + env(safe-area-inset-bottom));
-  }
-  .mobile-rescue { padding-top: 4px !important; }
-}
-
-/* ------------------------------------------------
-   Small cosmetic helpers not tied to Tailwind classes
--------------------------------------------------- */
-
-/* Small shadow for compact cards */
-.compact-shadow {
-  box-shadow: 0 3px 10px rgba(0,0,0,0.04);
-}
-
-/* Utility to visually cap large empty bands (safety) */
-.reduced-gap-fix {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* Make sure the main ticker inline animation doesn't overflow page horizontally */
-.ticker {
-  display: inline-block;
-  white-space: nowrap;
-  will-change: transform;
-}
-
-/* ------------------------------------------------
-   Bottom tab bar (Facebook/Instagram-like) styles
-   Added for Phase 2 bottom navigation component
--------------------------------------------------- */
-
-/* container for bottom nav — keeps it centered and elevated */
-.bottom-tabbar-wrapper {
-  position: fixed;
-  inset-inline: 0;
-  bottom: 8px; /* lifted slightly so it's not flush against screen edge */
-  z-index: 80;
-  display: flex;
-  justify-content: center;
-  pointer-events: none; /* parent container will carry pointer events on inner content */
-}
-
-/* actual bar: rounded, semi-opaque, shadowed */
-.bottom-tabbar {
-  pointer-events: auto;
-  background: rgba(255,255,255,0.96);
-  backdrop-filter: blur(6px) saturate(1.05);
-  border: 1px solid rgba(16,185,129,0.06);
-  border-radius: 14px;
-  padding: 6px 10px;
-  box-shadow: 0 8px 30px rgba(16,185,129,0.06);
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-/* the invisible spacer ensures page content not overlapped when bar is fixed */
-.bottom-nav-spacer {
-  height: calc(78px + env(safe-area-inset-bottom));
-}
-
-/* small pill that appears above active icon (animated by framer-motion) */
-.bottom-active-pill {
-  display: inline-block;
-  border-radius: 9999px;
-  padding: 0.15rem 0.45rem;
-  font-size: 10px;
-  font-weight: 600;
-  color: #065f46; /* emerald-800 */
-  background: rgba(16,185,129,0.06); /* subtle tint */
-  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
-}
-
-/* optional shine animation (use class .bottom-pill-shine) */
-@keyframes sccc-pill-shine {
-  0% { opacity: 0; transform: translateY(8px) scaleX(0.96); }
-  45% { opacity: 1; transform: translateY(-2px) scaleX(1.02); }
-  100% { opacity: 1; transform: translateY(0) scaleX(1); }
-}
-.bottom-pill-shine {
-  animation: sccc-pill-shine 420ms cubic-bezier(.2,.9,.3,1);
-}
-
-/* icon + label tuning inside the tabbar (keeps touch targets comfy) */
-.bottom-tabbar button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: 8px;
+.app-card {
+  width: 100%;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   background: transparent;
-  border: none;
 }
+.app-card-body { box-sizing: border-box; padding-bottom: 68px; }
 
-/* active vs inactive */
-.bottom-tabbar .active-icon {
-  color: #059669; /* emerald-500 */
+/* inline bottom tabbar */
+.inline-bottom-tabbar, .inline-bottom-center {
+  width: 100%; display: flex; justify-content: center; pointer-events: auto; box-sizing: border-box;
 }
-.bottom-tabbar .inactive-icon {
-  color: rgba(17,24,39,0.6); /* zinc-700ish */
+.inline-bottom-center { margin-top: -6px; }
+.inline-bottom-tabbar .bottom-tabbar,
+.inline-bottom-center .bottom-tabbar {
+  width: 100%; max-width: 640px; background: rgba(255,255,255,0.98);
+  backdrop-filter: blur(6px) saturate(1.05);
+  border: 1px solid rgba(16,185,129,0.06); border-radius: 14px;
+  padding: 6px 8px; box-shadow: 0 8px 30px rgba(16,185,129,0.06);
+  display: flex; gap: 6px; align-items: center;
 }
-
-/* focus ring for keyboard users */
-.bottom-tabbar button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 4px rgba(16,185,129,0.12);
-  border-radius: 8px;
-}
-
-/* reduce hit area on very narrow screens while preserving touch target */
+.inline-bottom-tabbar .bottom-tabbar button,
+.inline-bottom-center .bottom-tabbar button { padding: 6px 6px; }
+.inline-bottom-spacer { height: calc(78px + env(safe-area-inset-bottom)); width: 100%; }
+.bottom-tabbar .active-icon { color: #4f46e5; }
+.bottom-tabbar .inactive-icon { color: rgba(17,24,39,0.6); }
+.bottom-tabbar button:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(79,70,229,0.12); border-radius: 8px; }
 @media (max-width: 420px) {
-  .bottom-tabbar { padding-left: 6px; padding-right: 6px; }
-  .bottom-tabbar button { padding: 6px; gap: 2px; }
-  .bottom-active-pill { font-size: 9px; padding: 0.12rem 0.35rem; }
+  .inline-bottom-tabbar .bottom-tabbar { padding-left: 6px; padding-right: 6px; }
+  .inline-bottom-tabbar .bottom-tabbar button { padding: 6px; gap: 2px; }
 }
 
-/* ------------------------------------------------
-   Defensive: when mobile-scale is applied we already add bottom padding,
-   but ensure on other wrappers as well so bottom nav never overlaps content.
--------------------------------------------------- */
-body,
-.main-content,
-.app-canvas,
-.admin-canvas {
-  /* base safe bottom padding for devices without mobile-scale wrapper */
+/* defensive bottom padding */
+body, .main-content, .app-canvas, .admin-canvas {
   padding-bottom: calc(78px + env(safe-area-inset-bottom));
 }
 
-/* ------------------------------------------------
-   Small helper: no-scrollbar
-   Useful for horizontally scrollable tabbars etc.
--------------------------------------------------- */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+/* no-scrollbar helper */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* ------------------------------------------------
-   Admin-bottom-bar specific helpers
-   These are used by the AdminBottomBar component (mobile fixed bar)
-   We render the component outside the scaled canvas so it stays at real viewport size.
--------------------------------------------------- */
+/* ================================================================
+   ADMIN — PHONE-LIKE CARD + 55% INTERNAL SCALE
+================================================================= */
 
-.admin-bottombar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 160;
-  background: rgba(255,255,255,0.98);
-  backdrop-filter: blur(6px) saturate(1.05);
-  border-top: 1px solid rgba(0,0,0,0.04);
-  padding: 8px 10px;
-  box-shadow: 0 -8px 30px rgba(2,6,23,0.04);
+/* Page wrapper: centers the card and prevents page scroll */
+.admin-card-wrapper{
+  width:100%;
+  height:100vh;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  background:#fff;
+  padding-top:8px;
+  padding-bottom:env(safe-area-inset-bottom);
+  overflow:hidden;
 }
 
-.admin-bottombar .admin-bottom-inner {
-  max-width: 980px;
+/* The card itself: phone-like breadth + overlay container */
+.admin-card{
+  position: relative;           /* for .overlay-in-card */
+  overflow: hidden;
+  width: 100%;
+  max-width: var(--phone-w);
+  min-height: min(var(--phone-h), 92vh); /* tall feel but adaptable */
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  box-shadow:0 6px 24px rgba(2,6,23,0.05);
+}
+
+/* Internal scale with width-compensation (visuals shrink, card breadth stays) */
+.admin-scale{
+  transform: scale(var(--adm-scale));
+  transform-origin: top left;
+  width: calc(100% / var(--adm-scale));
+}
+
+/* Side gutters + full-breadth content */
+.admin-inner{
+  width: 92%;
+  max-width: calc(var(--phone-w) - 28px);
   margin: 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: space-between;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* horizontally scrollable tabs area */
-.admin-bottombar .admin-tabs {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
-}
-.admin-bottombar .admin-tabs.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-.admin-bottombar .admin-tabs.no-scrollbar::-webkit-scrollbar { display: none; }
-
-/* each tab button */
-.admin-bottombar button.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: transparent;
-  border: none;
-  color: rgba(17,24,39,0.65);
-  font-size: 12px;
-}
-.admin-bottombar button.tab.active {
-  color: #059669;
-  background: rgba(16,185,129,0.06);
+/* Body scroll area inside the card */
+.admin-card .app-card-body{
+  min-height: 0;
+  max-height: calc(var(--phone-h) - 16px);
+  overflow-y:auto;
+  box-sizing:border-box;
+  padding: 8px 10px 44px 10px;
 }
 
-/* center FAB wrapper to keep it above the bar when needed */
-.admin-bottombar .fab-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 6px;
-  margin-right: 6px;
+/* Compact internal typography/controls */
+.admin-card .admin-main{ font-size:11px; line-height:1.3; }
+.admin-card .admin-main h1{ font-size:13px; }
+.admin-card .admin-main h2{ font-size:12px; }
+.admin-card .admin-main h3, .admin-card .admin-main .section-title{ font-size:11.5px; }
+
+.admin-card .admin-main input,
+.admin-card .admin-main select,
+.admin-card .admin-main textarea{
+  font-size:10.5px;
+  padding:4px 6px;
+  min-height:26px;
+  border-radius:6px;
 }
 
-/* FAB */
-.admin-bottombar .fab {
-  height: 48px;
-  width: 48px;
-  border-radius: 9999px;
-  background: #059669;
-  color: white;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 22px rgba(5,102,105,0.18);
-  border: 4px solid rgba(255,255,255,0.9);
+.admin-card .admin-main button,
+.admin-card .admin-main .btn{
+  font-size:10.5px;
+  padding:4px 6px;
+  min-height:26px;
+  border-radius:6px;
 }
 
-/* small screens — tighter pill and smaller icons */
-@media (max-width: 420px) {
-  .admin-bottombar { padding-left: 6px; padding-right: 6px; }
-  .admin-bottombar button.tab { padding: 6px; gap: 4px; font-size: 11px; }
-  .admin-bottombar .fab { height: 44px; width: 44px; }
+/* Tables denser */
+.admin-card .admin-main table th,
+.admin-card .admin-main table td{
+  padding:0.30rem 0.40rem;
+  font-size:10.5px;
 }
 
-/* ------------------------------------------------
-   End of globals.css
--------------------------------------------------- */
+/* Ensure common blocks already stretch */
+.admin-card .admin-main .rounded-2xl,
+.admin-card .admin-main .card,
+.admin-card .admin-main .border,
+.admin-card .admin-main .table-scroll,
+.admin-card .admin-main table{ width:100%!important; }
+
+/* In-card hamburger nudge on tiny screens (optional) */
+@media (max-width:480px){
+  .admin-card [style*="position: absolute"][style*="top: 12px"]{ top:8px!important; left:8px!important; }
+}
+
+/* Bottom tabbar: extra compact on mobile (when used) */
+@media (max-width: 480px) {
+  .admin-bottombar .admin-tabs .tab { padding: 2px 4px; }
+  .admin-bottombar .admin-tabs .tab span:last-child { font-size: 9.5px; line-height: 9.5px; }
+  .admin-fab { width: 36px !important; height: 36px !important; }
+}
+
+/* ===== Image overlay INSIDE the card ===== */
+.overlay-in-card{
+  position:absolute; inset:0;
+  z-index:200;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(2px);
+  padding:8px;
+}
+.overlay-in-card .overlay-media{
+  max-width:calc(100% - 16px);
+  max-height:calc(100% - 16px);
+  width:auto; height:auto; object-fit:contain;
+  border-radius:10px; background:#fff;
+  box-shadow:0 20px 50px rgba(0,0,0,0.35);
+}
+
+/* ================================================================
+   ADMIN FLUID FILL WIDTH (NEW)
+   Forces inner panels to match the card breadth and removes
+   max-width / auto-centering that keep things too skinny.
+================================================================= */
+.admin-fluid, .admin-fluid * { max-width: 100% !important; }
+.admin-fluid .mx-auto,
+.admin-main .mx-auto { margin-left: 0 !important; margin-right: 0 !important; }
+
+.admin-fluid .container,
+.admin-fluid [class*="max-w-"],
+.admin-main  .container,
+.admin-main  [class*="max-w-"] { max-width: 100% !important; }
+
+.admin-fluid section,
+.admin-fluid .panel,
+.admin-fluid .card,
+.admin-fluid .rounded-2xl,
+.admin-fluid .border { width: 100% !important; }
+
+.admin-fluid .inline,
+.admin-fluid .inline-flex,
+.admin-fluid .inline-block { width: auto !important; }
+
+.admin-fluid .toolbar,
+.admin-fluid .filters,
+.admin-fluid .actions {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
