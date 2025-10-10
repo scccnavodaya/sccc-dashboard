@@ -1,18 +1,16 @@
-// app/(public)/layout.tsx
+// app/layout.tsx
 import React from "react";
-import ClientBodyHydrator from "@/components/ClientBodyHydrator";
+import "../styles/globals.css";
 
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head />
       <body
-        className="mobile-rescue min-h-screen bg-zinc-50 text-zinc-900 overflow-x-hidden"
         suppressHydrationWarning
+        className="mobile-rescue min-h-screen bg-zinc-50 text-zinc-900 overflow-x-hidden"
       >
-        {/* Runs after hydration; ensure it doesn't remove classes added on the server */}
-        <ClientBodyHydrator />
-        <main className="w-full">{children}</main>
+        {children}
       </body>
     </html>
   );
