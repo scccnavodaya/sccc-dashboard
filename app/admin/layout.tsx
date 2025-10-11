@@ -4,7 +4,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, X, Home, Newspaper, Megaphone, Images, Users, ClipboardList, Settings } from "lucide-react";
+import {
+  Menu,
+  X,
+  Home,
+  Newspaper,
+  Megaphone,
+  Images,
+  Users,
+  ClipboardList,
+  Settings,
+  MessageSquareHeart, // ⬅️ added
+} from "lucide-react";
 
 const TABS = [
   { label: "Home", href: "/admin", icon: Home },
@@ -13,6 +24,7 @@ const TABS = [
   { label: "Notices", href: "/admin/notices", icon: Images },
   { label: "Students", href: "/admin/students", icon: Users },
   { label: "Tests", href: "/admin/tests", icon: ClipboardList },
+  { label: "Feedback", href: "/admin/feedback", icon: MessageSquareHeart }, // ⬅️ inserted here
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
