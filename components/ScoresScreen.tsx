@@ -2,12 +2,17 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 
 import MonthPicker from "@/components/MonthPicker";
 import DateDropdown from "@/components/DateDropdown";
 import ChipBar, { ChipKey } from "@/components/ChipBar";
 import SectionGrid, { SectionKey } from "@/components/SectionGrid";
-import LatestExamTicker from "@/components/LatestExamTicker";
+// ✅ render ticker only on the client to avoid hydration mismatches
+const LatestExamTicker = dynamic(() => import("@/components/LatestExamTicker"), {
+  ssr: false,
+  loading: () => <div className="text-xs text-zinc-400">Loading…</div>,
+});
 
 import { usePublicScores } from "@/hooks/usePublicScores";
 import { usePublicStudents } from "@/hooks/usePublicStudents";
@@ -31,13 +36,11 @@ function ymNowIST(): string {
 
 type SubjectKey = "MAT" | "ENGLISH" | "MATHS";
 
-/** Safe utility: try extract numeric score (number) or return "Present" marker or null.
- *  Returns number | "Present" | null
- */
+/** Safe utility: try extract numeric score (number) or return "Present" marker or null. */
 function extractScoreFromMark(m: any): number | "Present" | null {
   if (!m) return null;
 
-  // check common numeric fields
+  // numeric fields
   const numericCandidates = [
     "score",
     "marks",
@@ -57,7 +60,7 @@ function extractScoreFromMark(m: any): number | "Present" | null {
     }
   }
 
-  // nested numeric shapes
+  // nested shapes
   if (m.score && typeof m.score === "object") {
     const n = Number(m.score.value ?? m.score.marks ?? m.score.obtained ?? m.score);
     if (Number.isFinite(n)) return n;
@@ -67,7 +70,7 @@ function extractScoreFromMark(m: any): number | "Present" | null {
     if (Number.isFinite(n)) return n;
   }
 
-  // detect present-like values in `status` or similar fields and normalize to "Present"
+  // status normalization
   const statusRaw = m.status ?? m.state ?? m.attendance ?? m.present ?? m.flag ?? "";
   let status = "";
   if (typeof statusRaw === "string") status = statusRaw.trim().toLowerCase();
@@ -79,13 +82,17 @@ function extractScoreFromMark(m: any): number | "Present" | null {
   return null;
 }
 
-/** Friendly date formatting helper */
+/** Friendly date formatting helper (force UTC for SSR/CSR parity) */
 function fmtDateLabel(d?: string | null) {
   if (!d) return null;
   try {
     const dt = new Date(d);
     if (!Number.isFinite(dt.getTime())) return null;
-    return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: undefined });
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "2-digit",
+      timeZone: "UTC",
+    }).format(dt);
   } catch {
     return null;
   }
@@ -97,11 +104,10 @@ export default function ScoresScreen(): React.ReactElement {
   const [subject, setSubject] = useState<ChipKey>("MAT");
   const [dateOpt, setDateOpt] = useState<string>("ALL");
 
-  // Data hooks (reuse your existing hooks)
+  // Data hooks
   const { tests = [], marks = [] } = usePublicScores(month) as any;
   const { students = [] } = usePublicStudents() as any;
   const { stats: publicStats } = usePublicStats(month) as any;
-  // keep existing notices hook but do NOT pass those objects into the ticker
   const { notices = [] } = usePublicNotices() as any;
 
   // Build small summary numbers
@@ -109,29 +115,36 @@ export default function ScoresScreen(): React.ReactElement {
 
   // Determine subjectKey safely
   const subjectKey: SubjectKey =
-    subject === "MAT" || subject === "ENGLISH" || subject === "MATHS"
-      ? (subject as SubjectKey)
-      : "MAT";
+    subject === "MAT" || subject === "ENGLISH" || subject === "MATHS" ? (subject as SubjectKey) : "MAT";
 
   // Subject-specific tests
   const subjectTests = useMemo(() => {
     return (tests || []).filter((t: any) => String(t.section ?? "MAT").toUpperCase() === subjectKey);
   }, [tests, subjectKey]);
 
-  // Date options for DateDropdown
+  // Fast lookup
+  const testsById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const t of subjectTests) map.set(String(t.id), t);
+    return map;
+  }, [subjectTests]);
+
+  // Date options for DateDropdown (force UTC for deterministic SSR/CSR)
   const dateOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [{ value: "ALL", label: "Latest test" }];
     for (const t of subjectTests) {
       const testDateRaw = String(t.test_date ?? t.testDate ?? t.exam_date ?? "");
       const label = testDateRaw
-        ? new Date(testDateRaw + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "2-digit" })
+        ? new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" }).format(
+            new Date(testDateRaw + "T00:00:00Z")
+          )
         : (t.title ?? t.name ?? "—");
       opts.push({ value: String(t.id), label });
     }
     return opts;
   }, [subjectTests]);
 
-  // Resolve selected test id: if dateOpt === "ALL" -> latest test id
+  // Resolve selected test id
   const selectedTestId = useMemo(() => {
     if (dateOpt && dateOpt !== "ALL") return dateOpt;
     const sorted = [...subjectTests].sort((a: any, b: any) => {
@@ -142,35 +155,120 @@ export default function ScoresScreen(): React.ReactElement {
     return sorted.length ? String(sorted[0].id) : null;
   }, [dateOpt, subjectTests]);
 
-  // Find selected test object (for label, max marks, friendly display)
+  // Find selected test object
   const selectedTest = useMemo(() => {
     if (!selectedTestId) return null;
     return (subjectTests || []).find((t: any) => String(t.id) === String(selectedTestId)) ?? null;
   }, [subjectTests, selectedTestId]);
 
-  // Build a friendly test label to show in header
+  // Build a friendly test label
   const testLabel = useMemo(() => {
     if (!selectedTest) return null;
     const t = selectedTest as any;
-    // prefer useful textual fields
     const candidates = [t.title, t.name, t.test_name, t.label];
-    for (const c of candidates) {
-      if (c && String(c).trim()) return String(c).trim();
-    }
-    // try date fields
+    for (const c of candidates) if (c && String(c).trim()) return String(c).trim();
     const dateCandidate = t.test_date ?? t.testDate ?? t.exam_date ?? t.release_at ?? t.created_at;
     const formatted = fmtDateLabel(String(dateCandidate ?? ""));
     if (formatted) return formatted;
-    // fallback to short id (keep 8 chars) so it's less ugly
     const id = String(t.id ?? "");
     return id ? `${id.slice(0, 8)}…` : null;
   }, [selectedTest]);
 
-  // Present count for selected test (present = numeric score OR "Present" status)
+  // --- helpers: read test totals ---
+  const readTotalQuestions = (t: any): number | null => {
+    const candidates = [t?.total_questions, t?.questions, t?.totalQuestions, t?.total_q];
+    for (const v of candidates) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  };
+  const readMpq = (t: any): number | null => {
+    const candidates = [t?.marks_per_question, t?.mark_per_question, t?.mpq];
+    for (const v of candidates) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  };
+  const readTotalMarks = (t: any): number | null => {
+    const candidates = [t?.total_marks, t?.totalMarks, t?.max_marks, t?.full_marks];
+    for (const v of candidates) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  };
+
+  /** compute full marks for a given test (denominator) — ALWAYS Q × MPQ (derive MPQ from total_marks if needed) */
+  function fullMarksForTest(t: any): number {
+    if (!t) return 0;
+    const Q = readTotalQuestions(t) ?? 0;
+    if (!(Number.isFinite(Q) && Q > 0)) return 0;
+
+    const mpqExplicit = readMpq(t);
+    if (Number.isFinite(mpqExplicit as number) && (mpqExplicit as number) > 0) {
+      return Q * (mpqExplicit as number);
+    }
+
+    // derive MPQ if explicit is absent
+    const tm = readTotalMarks(t);
+    const mpqDerived = Number.isFinite(tm as number) && (tm as number) > 0 ? (tm as number) / Q : 0;
+
+    return mpqDerived > 0 ? Q * mpqDerived : 0;
+  }
+
+  /** compute student score from mark + test:
+   * 1) numeric score wins
+   * 2) else if wrong provided -> (Q - wrong) * mpq (mpq explicit or derived)
+   * 3) else if present -> Q * mpq
+   * 4) else null
+   */
+  function computeStudentScore(mark: any, test: any): number | null {
+    if (!mark || !test) return null;
+
+    // 1) numeric score
+    const extracted = extractScoreFromMark(mark);
+    if (typeof extracted === "number") return extracted;
+
+    const Q = readTotalQuestions(test);
+    if (!Number.isFinite(Q as number) || (Q as number) <= 0) return null;
+
+    // resolve MPQ: explicit or derived from total_marks/Q
+    const mpqExplicit = readMpq(test);
+    const tm = readTotalMarks(test);
+    const MPQ =
+      (Number.isFinite(mpqExplicit as number) && (mpqExplicit as number) > 0)
+        ? (mpqExplicit as number)
+        : (Number.isFinite(tm as number) && (tm as number) > 0 ? (tm as number) / (Q as number) : 0);
+
+    // 2) from wrong
+    const wrongRaw = Number(mark.wrong ?? mark.wrongs ?? mark.incorrect);
+    if (Number.isFinite(wrongRaw) && MPQ > 0) {
+      const wrong = Math.max(0, Math.min(wrongRaw, Q as number));
+      return Math.max(0, ((Q as number) - wrong) * MPQ);
+    }
+
+    // 3) present -> full marks
+    if (extracted === "Present" && MPQ > 0) return (Q as number) * MPQ;
+
+    return null;
+  }
+
+  /** denominator for the grid (selected test only) */
+  const maxScoreForGrid = useMemo(() => {
+    if (!selectedTestId) return 0;
+    const t = testsById.get(String(selectedTestId));
+    return fullMarksForTest(t);
+  }, [selectedTestId, testsById]);
+
+  // Present count: numeric score OR "Present" OR has a numeric wrong (treated as present)
   const presentCount = useMemo(() => {
     const isPresentMark = (m: any) => {
       const sc = extractScoreFromMark(m);
-      return sc === "Present" || (typeof sc === "number" && Number.isFinite(sc));
+      if (sc === "Present" || (typeof sc === "number" && Number.isFinite(sc))) return true;
+      const wrong = Number(m?.wrong ?? m?.wrongs ?? m?.incorrect);
+      return Number.isFinite(wrong);
     };
 
     if (!selectedTestId) {
@@ -189,56 +287,73 @@ export default function ScoresScreen(): React.ReactElement {
     return ids.size;
   }, [marks, selectedTestId, subjectTests]);
 
-  // Tests count shown (for this subject)
-  const testsCount = subjectTests.length;
+  // Tests count
+  const testsCount = useMemo(() => subjectTests.length, [subjectTests]);
 
-  // Build rows for SectionGrid (one row per student)
+  // Build rows for SectionGrid
   const rows = useMemo(() => {
     const testId = selectedTestId;
     const subjectTestIds = new Set(subjectTests.map((t: any) => String(t.id)));
+
     return (students || []).map((s: any) => {
       const id = String(s.id ?? "");
       const row: any = { id, name: s.name ?? s.full_name ?? "—", photo: s.photo ?? null };
 
-      // normalize status for this student/test
       let statusVal: string | null = null;
 
       if (testId) {
         const mm = (marks || []).find((m: any) => String(m.test_id) === String(testId) && String(m.student_id) === id);
-        const extracted = extractScoreFromMark(mm);
+        const t = testsById.get(String(testId));
 
-        // If numeric, set numeric; if "Present" set Present string, else null
-        const scoreVal = typeof extracted === "number" ? extracted : extracted === "Present" ? "Present" : null;
+        let numeric: number | null = null;
+        if (mm && t) {
+          numeric = computeStudentScore(mm, t);
 
-        // status normalization: prefer extracted "Present", otherwise try mm.status directly
-        if (extracted === "Present") statusVal = "Present";
-        else if (mm && mm.status) {
-          const sraw = String(mm.status).trim().toLowerCase();
-          if (["pass", "present", "attended", "p", "presented", "yes"].includes(sraw)) statusVal = "Present";
-          else statusVal = mm.status;
+          // status normalization
+          const ex = extractScoreFromMark(mm);
+          if (!numeric && ex === "Present") statusVal = "Present";
+          if (!statusVal && mm && mm.status) {
+            const sraw = String(mm.status).trim().toLowerCase();
+            if (["pass", "present", "attended", "p", "presented", "yes"].includes(sraw)) statusVal = "Present";
+            else if (["absent", "a", "no", "false"].includes(sraw)) statusVal = "Absent";
+            else statusVal = mm.status;
+          }
         }
+
+        const scoreVal = numeric != null ? numeric : statusVal === "Present" ? (t ? fullMarksForTest(t) : null) : null;
 
         if (subjectKey === "MAT") row.mat = scoreVal;
         if (subjectKey === "ENGLISH") row.eng = scoreVal;
         if (subjectKey === "MATHS") row.maths = scoreVal;
       } else {
+        // latest across subject tests
         const last = [...marks]
           .reverse()
           .find(
             (m: any) =>
               String(m.student_id) === id &&
               subjectTestIds.has(String(m.test_id)) &&
-              (extractScoreFromMark(m) !== null)
+              (extractScoreFromMark(m) !== null || m?.wrong != null)
           );
 
-        const extracted = last ? extractScoreFromMark(last) : null;
-        const val = typeof extracted === "number" ? extracted : extracted === "Present" ? "Present" : null;
-
-        if (extracted === "Present") statusVal = "Present";
-        else if (last && last.status) {
-          const sraw = String(last.status).trim().toLowerCase();
-          if (["pass", "present", "attended", "p", "presented", "yes"].includes(sraw)) statusVal = "Present";
-          else statusVal = last.status;
+        let val: number | "Present" | null = null;
+        if (last) {
+          const t = testsById.get(String(last.test_id));
+          if (t) {
+            const numeric = computeStudentScore(last, t);
+            if (numeric != null) {
+              val = numeric;
+            } else {
+              const ex = extractScoreFromMark(last);
+              if (ex === "Present") val = (t ? fullMarksForTest(t) : "Present");
+            }
+            if (!statusVal && last && last.status) {
+              const sraw = String(last.status).trim().toLowerCase();
+              if (["pass", "present", "attended", "p", "presented", "yes"].includes(sraw)) statusVal = "Present";
+              else if (["absent", "a", "no", "false"].includes(sraw)) statusVal = "Absent";
+              else statusVal = last.status;
+            }
+          }
         }
 
         if (subjectKey === "MAT") row.mat = val;
@@ -246,34 +361,10 @@ export default function ScoresScreen(): React.ReactElement {
         if (subjectKey === "MATHS") row.maths = val;
       }
 
-      // attach normalized status to the row (SectionGrid can show this)
       row.status = statusVal;
-
       return row;
     });
-  }, [students, marks, selectedTestId, subjectKey, subjectTests]);
-
-  // compute max score for grid from selected test if present
-  function fullMarksForTest(t: any): number | null {
-    if (!t) return null;
-    const candidates = [t.max_marks, t.maxMarks, t.max_score, t.full_marks, t.fullMarks, t.total_marks];
-    for (const c of candidates) {
-      const n = Number(c);
-      if (Number.isFinite(n) && n > 0) return n;
-    }
-    const tq = Number(t.total_questions ?? t.questions ?? t.totalQuestions ?? t.total_q);
-    let mpq = Number(t.marks_per_question ?? t.mark_per_question ?? t.mpq);
-    if (Number.isFinite(tq) && tq > 0) {
-      if (!Number.isFinite(mpq) || mpq <= 0) mpq = 1.25;
-      return tq * mpq;
-    }
-    return null;
-  }
-  const maxScoreForGrid = useMemo(() => {
-    if (!selectedTestId) return 50;
-    const t = (subjectTests || []).find((x: any) => String(x.id) === String(selectedTestId));
-    return t ? (fullMarksForTest(t) ?? 50) : 50;
-  }, [subjectTests, selectedTestId]);
+  }, [students, marks, selectedTestId, subjectKey, subjectTests, testsById]);
 
   // Only include the three subject tabs for ChipBar
   const colorByKey = {
@@ -291,8 +382,6 @@ export default function ScoresScreen(): React.ReactElement {
       <div className="rounded-2xl border bg-white p-3 flex items-center gap-3">
         <div className="text-xs font-semibold text-zinc-700 shrink-0">New</div>
 
-        {/* LatestExamTicker now fetches exact exam ticker endpoint itself.
-            This avoids passing the media 'notices' array (which is a different dataset). */}
         <div className="flex-1 overflow-hidden">
           <LatestExamTicker fetchUrl="/api/exam-ticker" textColorClass="text-blue-600" />
         </div>
@@ -329,7 +418,13 @@ export default function ScoresScreen(): React.ReactElement {
 
         <div className="flex items-center gap-2">
           <div className="w-36">
-            <MonthPicker value={month} onChange={(ym) => { setMonth(ym); setDateOpt("ALL"); }} />
+            <MonthPicker
+              value={month}
+              onChange={(ym) => {
+                setMonth(ym);
+                setDateOpt("ALL");
+              }}
+            />
           </div>
           <div className="flex-1">
             <DateDropdown label="Date" value={dateOpt} onChange={setDateOpt} options={dateOptions} />
@@ -337,17 +432,15 @@ export default function ScoresScreen(): React.ReactElement {
         </div>
       </div>
 
-      {/* --- Marks table area: fixed-sized scroll area (only this scrolls) --- */}
+      {/* --- Marks table area --- */}
       <div className="rounded-2xl border bg-white p-3 flex flex-col min-h-0">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold">Scores — {subjectKey}</div>
-          {/* Render friendly test label (title/date/short id) instead of full UUID */}
           <div className={`text-[11px] ${theme.text}`}>
             {selectedTest ? `Test: ${testLabel ?? selectedTestId}` : "Latest available"}
           </div>
         </div>
 
-        {/* Constrained height — roughly shows ~6 rows before scrolling */}
         <div className="overflow-y-auto" style={{ maxHeight: "36vh" }}>
           <SectionGrid
             mode="section"
@@ -360,7 +453,6 @@ export default function ScoresScreen(): React.ReactElement {
         </div>
       </div>
 
-      {/* --- small inline footer for screen --- */}
       <div className="text-xs text-zinc-500 text-center">
         change date to view scores for a specific exam. Top rows visible; scroll inside the list to see more.
       </div>

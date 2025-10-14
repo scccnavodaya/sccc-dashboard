@@ -1,7 +1,7 @@
 // app/admin/tests/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -9,10 +9,6 @@ import {
   ClipboardList,
   RotateCcw,
   CheckCircle2,
-  Pencil,
-  Trash2,
-  X,
-  Save,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -38,6 +34,8 @@ type RecentTest = {
   section: SectionKey;
   test_date: string; // YYYY-MM-DD
   total_questions?: number | null;
+  marks_per_question?: number | null;
+  total_marks?: number | null;
   created_at?: string | null;
   marks_count: number;
 };
@@ -71,16 +69,24 @@ function ymFromISO(isoDate: string) {
 }
 
 export default function AdminTestsPage() {
-  // form state (unchanged)
+  // --- form state ---
   const [section, setSection] = useState<SectionKey>("MAT");
   const [testDate, setTestDate] = useState<string>(() =>
     new Date().toISOString().slice(0, 10)
   );
+
   const [totalQStr, setTotalQStr] = useState<string>("0");
   const totalQ = useMemo(
     () => Math.max(0, parseInt((totalQStr || "0").trim(), 10) || 0),
     [totalQStr]
   );
+
+  // Marks per question defaults to 0 (no implicit fallback)
+  const [mpqStr, setMpqStr] = useState<string>("0");
+  const mpq = useMemo(() => {
+    const n = Number((mpqStr || "").trim());
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }, [mpqStr]);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
@@ -88,7 +94,7 @@ export default function AdminTestsPage() {
 
   const [banner, setBanner] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
-  // recent state (unchanged)
+  // recent state
   const [recent, setRecent] = useState<RecentTest[]>([]);
   const [recentFilter, setRecentFilter] = useState<SectionKey | "ALL">("ALL");
   const [recentMonth, setRecentMonth] = useState<string>(() => ymNowIST());
@@ -96,17 +102,26 @@ export default function AdminTestsPage() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<RecentTest | null>(null);
-  const [editDraft, setEditDraft] = useState<{ section: SectionKey; date: string; totalQStr: string; }>( {
+  const [editDraft, setEditDraft] = useState<{
+    section: SectionKey;
+    date: string;
+    totalQStr: string;
+    mpqStr: string;
+  }>({
     section: "MAT",
     date: "",
     totalQStr: "0",
+    mpqStr: "0",
   });
+
+  // track in-flight recent loader so we can abort stale ones
+  const recentAbortRef = useRef<AbortController | null>(null);
 
   // UI: which vertical tab is active — "form" or "recent"
   const [activeTab, setActiveTab] = useState<"form" | "recent">("form");
 
   const presentCount = useMemo(() => rows.filter((r) => r.present).length, [rows]);
-  const maxMarks = useMemo(() => totalQ * 1.25, [totalQ]);
+  const maxMarks = useMemo(() => totalQ * mpq, [totalQ, mpq]);
 
   function parseAndClampWrong(str: string): number {
     const n = parseInt((str || "").trim(), 10);
@@ -130,15 +145,14 @@ export default function AdminTestsPage() {
     setRows((list) => list.map((r) => ({ ...r, present: v })));
   }
 
-  async function revalidatePublic() {
-    try {
-      await fetch("/api/revalidate", { method: "POST" });
-    } catch {}
+  function revalidatePublic() {
+    // fire & forget; don't block UI
+    fetch("/api/revalidate", { method: "POST", cache: "no-store" }).catch(() => {});
   }
 
   async function loadStudents() {
     try {
-      const r = await fetch("/api/admin/students", { credentials: "include" });
+      const r = await fetch("/api/admin/students", { credentials: "include", cache: "no-store" });
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || "Failed to load students");
       const actives: Student[] = (data as Student[]).filter((s) => s.active !== false);
@@ -157,6 +171,13 @@ export default function AdminTestsPage() {
   }
 
   async function loadRecent() {
+    // abort any slow/stale request before starting a new one
+    if (recentAbortRef.current) {
+      try { recentAbortRef.current.abort(); } catch {}
+    }
+    const ctrl = new AbortController();
+    recentAbortRef.current = ctrl;
+
     setLoadingRecent(true);
     try {
       const params = new URLSearchParams();
@@ -164,13 +185,18 @@ export default function AdminTestsPage() {
       if (recentMonth) params.set("month", recentMonth);
       const r = await fetch(`/api/admin/tests${params.toString() ? `?${params.toString()}` : ""}`, {
         credentials: "include",
+        cache: "no-store",
+        signal: ctrl.signal,
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || "Failed to load tests");
       setRecent(data as RecentTest[]);
     } catch (e: any) {
-      setBanner({ type: "error", msg: e?.message || "Could not load tests." });
+      if (e?.name !== "AbortError") {
+        setBanner({ type: "error", msg: e?.message || "Could not load tests." });
+      }
     } finally {
+      if (recentAbortRef.current === ctrl) recentAbortRef.current = null;
       setLoadingRecent(false);
     }
   }
@@ -195,6 +221,10 @@ export default function AdminTestsPage() {
       setBanner({ type: "error", msg: "Total questions must be greater than 0." });
       return;
     }
+    if (!(mpq > 0)) {
+      setBanner({ type: "error", msg: "Marks per question must be greater than 0." });
+      return;
+    }
 
     setSaving(true);
     try {
@@ -202,6 +232,7 @@ export default function AdminTestsPage() {
         section,
         test_date: testDate,
         total_questions: totalQ,
+        marks_per_question: mpq,
         marks: rows
           .filter((r) => r.present)
           .map((r) => ({
@@ -214,10 +245,24 @@ export default function AdminTestsPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed to save test");
+
+      // optimistic: push into Recent immediately if it matches current filters
+      const createdId: string = data?.id || crypto.randomUUID();
+      const newItem: RecentTest = {
+        id: createdId,
+        section,
+        test_date: testDate,
+        total_questions: totalQ,
+        marks_per_question: mpq,
+        total_marks: totalQ * mpq,
+        created_at: new Date().toISOString(),
+        marks_count: rows.filter((r) => r.present).length,
+      };
 
       setRows((list) => list.map((r) => ({ ...r, wrongStr: "0" })));
 
@@ -226,8 +271,20 @@ export default function AdminTestsPage() {
       setRecentFilter(section);
       setRecentMonth(ymFromISO(testDate));
 
-      await loadRecent();
-      await revalidatePublic();
+      // only insert if current view shows the saved item
+      setRecent((old) => {
+        const matchesSection = recentFilter === "ALL" || recentFilter === section;
+        const matchesMonth = ymFromISO(testDate) === recentMonth;
+        if (matchesSection && matchesMonth) {
+          // insert at top (sorted latest first)
+          return [newItem, ...old];
+        }
+        return old;
+      });
+
+      // non-blocking: revalidate public and refetch actual recent to reconcile
+      revalidatePublic();
+      loadRecent();
 
       setBanner({ type: "success", msg: "Test saved & published to public page." });
     } catch (e: any) {
@@ -243,6 +300,7 @@ export default function AdminTestsPage() {
       section: t.section,
       date: t.test_date,
       totalQStr: String(t.total_questions ?? 0),
+      mpqStr: t.marks_per_question != null ? String(t.marks_per_question) : "0",
     });
   }
 
@@ -251,19 +309,45 @@ export default function AdminTestsPage() {
     setBanner(null);
     try {
       const tq = Math.max(0, parseInt((editDraft.totalQStr || "0").trim(), 10) || 0);
+      const mm = Number((editDraft.mpqStr || "").trim());
+      const mpqEdit = Number.isFinite(mm) && mm > 0 ? mm : 0;
+
       if (tq <= 0) {
         setBanner({ type: "error", msg: "Total questions must be greater than 0." });
         return;
       }
+      if (mpqEdit <= 0) {
+        setBanner({ type: "error", msg: "Marks per question must be greater than 0." });
+        return;
+      }
 
-      const r = await fetch(`/api/admin/tests/${editing.id}`, {
+      // optimistic: update list immediately
+      const editedId = editing.id;
+      setRecent((old) =>
+        old.map((t) =>
+          t.id === editedId
+            ? {
+                ...t,
+                section: editDraft.section,
+                test_date: editDraft.date,
+                total_questions: tq,
+                marks_per_question: mpqEdit,
+                total_marks: tq * mpqEdit,
+              }
+            : t
+        )
+      );
+
+      const r = await fetch(`/api/admin/tests/${editedId}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({
           section: editDraft.section,
           test_date: editDraft.date,
           total_questions: tq,
+          marks_per_question: mpqEdit,
         }),
       });
       const data = await r.json().catch(() => ({}));
@@ -273,32 +357,46 @@ export default function AdminTestsPage() {
       setRecentFilter(editDraft.section);
       setRecentMonth(ymFromISO(editDraft.date));
 
-      await loadRecent();
-      await revalidatePublic();
+      revalidatePublic();
+      loadRecent();
 
       setBanner({ type: "success", msg: "Test updated & republished." });
     } catch (e: any) {
+      // if server rejects, reload to correct optimistic UI
+      loadRecent();
       setBanner({ type: "error", msg: e?.message || "Could not update test." });
     }
   }
 
   async function doDelete(id: string) {
     setBanner(null);
+
+    // optimistic: remove row immediately
+    const prev = recent;
+    setRecent((old) => old.filter((t) => t.id !== id));
+    setConfirmDeleteId(null);
+
     try {
-      await fetch(`/api/admin/marks/by-test/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+      await fetch(`/api/admin/marks/by-test/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+        cache: "no-store",
+      }).catch(() => {});
       const r = await fetch(`/api/admin/tests/${id}`, {
         method: "DELETE",
         credentials: "include",
+        cache: "no-store",
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Delete failed");
 
-      setConfirmDeleteId(null);
-      await loadRecent();
-      await revalidatePublic();
+      revalidatePublic();
+      loadRecent();
 
       setBanner({ type: "success", msg: "Test deleted & removed from public page." });
     } catch (e: any) {
+      // revert optimistic removal on failure
+      setRecent(prev);
       setBanner({ type: "error", msg: e?.message || "Could not delete test." });
     }
   }
@@ -306,16 +404,11 @@ export default function AdminTestsPage() {
   // Responsive heights: generous on mobile, fixed on desktop
   const fixedScrollCls = "max-h-[60vh] md:h-[224px] overflow-y-auto";
 
-  const rowVariants = {
-    hidden: { opacity: 0, y: 4 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.18 } },
-  };
-
   // --- UI: vertical single-card layout with tab toggle ---
   return (
     <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-4">
       <div className="rounded-2xl border bg-white p-3 sm:p-4 shadow-sm">
-        {/* top bar: back + small title + quick stats */}
+        {/* top bar */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <Link
@@ -341,7 +434,7 @@ export default function AdminTestsPage() {
           </div>
         </div>
 
-        {/* Tabs toggle: New test | Recent */}
+        {/* Tabs toggle */}
         <div className="mb-3 flex items-center gap-2">
           <button
             onClick={() => setActiveTab("form")}
@@ -383,7 +476,7 @@ export default function AdminTestsPage() {
           )}
         </AnimatePresence>
 
-        {/* Content area: show form or recent based on activeTab */}
+        {/* Content area */}
         <div>
           {/* NEW TEST FORM */}
           <AnimatePresence initial={false} mode="wait">
@@ -397,7 +490,8 @@ export default function AdminTestsPage() {
                 transition={{ duration: 0.18 }}
                 className="space-y-3"
               >
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {/* form grid */}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
                   <div>
                     <label className="text-[11px] text-zinc-600">Section</label>
                     <select
@@ -436,10 +530,24 @@ export default function AdminTestsPage() {
                       placeholder="0"
                     />
                   </div>
+
+                  <div>
+                    <label className="text-[11px] text-zinc-600">Marks / Question</label>
+                    <input
+                      inputMode="decimal"
+                      value={mpqStr}
+                      onChange={(e) => setMpqStr(e.target.value.replace(/[^0-9.]/g, ""))}
+                      onBlur={() => { if (!mpq || mpq <= 0) setMpqStr("0"); }}
+                      className="mt-1 w-full rounded border border-zinc-300 px-2.5 py-2 text-sm transition focus:ring-2 focus:ring-emerald-300"
+                      placeholder="0"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="text-xs text-zinc-600">Enter wrong counts (each Q = 1.25)</div>
+                  <div className="text-xs text-zinc-600">
+                    Enter wrong counts (each Q = <span className="font-medium">{fmt(mpq)}</span>)
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -472,7 +580,7 @@ export default function AdminTestsPage() {
                     <tbody>
                       {rows.map((r, i) => {
                         const wrong = parseAndClampWrong(r.wrongStr);
-                        const score = r.present ? Math.max(0, (totalQ - wrong) * 1.25) : 0;
+                        const score = r.present ? Math.max(0, (totalQ - wrong) * mpq) : 0;
                         const stu = students.find((s) => s.id === r.student_id);
                         return (
                           <tr key={r.student_id} className="border-t hover:bg-zinc-50">
@@ -524,7 +632,7 @@ export default function AdminTestsPage() {
                     </button>
                     <button
                       type="submit"
-                      disabled={saving || !testDate || totalQ === 0}
+                      disabled={saving || !testDate || totalQ === 0 || !(mpq > 0)}
                       className="inline-flex items-center gap-2 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white"
                     >
                       <CheckCircle2 size={14} />
@@ -576,6 +684,7 @@ export default function AdminTestsPage() {
                         <th className="px-2 py-2 whitespace-nowrap">Date</th>
                         <th className="px-2 py-2 whitespace-nowrap">Section</th>
                         <th className="px-2 py-2 whitespace-nowrap">Total Q</th>
+                        <th className="px-2 py-2 whitespace-nowrap">Marks/Q</th>
                         <th className="px-2 py-2 text-right whitespace-nowrap">Entries</th>
                         <th className="px-2 py-2 text-right whitespace-nowrap">Actions</th>
                       </tr>
@@ -587,18 +696,22 @@ export default function AdminTestsPage() {
                             <td className="px-3 py-2"><div className="h-3 w-28 animate-pulse rounded bg-zinc-200" /></td>
                             <td className="px-3 py-2"><div className="h-3 w-20 animate-pulse rounded bg-zinc-200" /></td>
                             <td className="px-3 py-2"><div className="h-3 w-16 animate-pulse rounded bg-zinc-200" /></td>
+                            <td className="px-3 py-2"><div className="h-3 w-14 animate-pulse rounded bg-zinc-200" /></td>
                             <td className="px-3 py-2 text-right"><div className="ml-auto h-3 w-10 animate-pulse rounded bg-zinc-200" /></td>
                             <td className="px-3 py-2 text-right"><div className="ml-auto h-6 w-20 animate-pulse rounded bg-zinc-200" /></td>
                           </tr>
                         ))
                       ) : recent.length === 0 ? (
-                        <tr><td colSpan={5} className="px-3 py-6 text-center text-zinc-500">No tests found</td></tr>
+                        <tr><td colSpan={6} className="px-3 py-6 text-center text-zinc-500">No tests found</td></tr>
                       ) : (
                         recent.map((t) => (
                           <tr key={t.id} className="border-t hover:bg-zinc-50">
-                            <td className="px-3 py-2 whitespace-nowrap">{new Date(t.test_date + "T00:00:00").toLocaleDateString("en-IN")}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {new Date(t.test_date + "T00:00:00").toLocaleDateString("en-IN")}
+                            </td>
                             <td className="px-3 py-2 whitespace-nowrap">{t.section}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{t.total_questions ?? 0}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{fmt(t.marks_per_question ?? 0)}</td>
                             <td className="px-3 py-2 text-right whitespace-nowrap">{t.marks_count}</td>
                             <td className="px-3 py-2 text-right">
                               {confirmDeleteId === t.id ? (
@@ -623,20 +736,61 @@ export default function AdminTestsPage() {
                 {/* Edit panel */}
                 <AnimatePresence>
                   {editing && (
-                    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="mt-3 rounded-xl border bg-white p-3">
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      className="mt-3 rounded-xl border bg-white p-3"
+                    >
                       <div className="mb-2 text-sm font-semibold">Edit test</div>
-                      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                        <select value={editDraft.section} onChange={(e) => setEditDraft((d) => ({ ...d, section: e.target.value as SectionKey }))} className="rounded border border-zinc-300 px-3 py-2 text-sm">
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+                        <select
+                          value={editDraft.section}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, section: e.target.value as SectionKey }))}
+                          className="rounded border border-zinc-300 px-3 py-2 text-sm"
+                        >
                           <option value="MAT">MAT</option>
                           <option value="ENGLISH">ENGLISH</option>
                           <option value="MATHS">MATHS</option>
                         </select>
-                        <input type="date" value={editDraft.date} onChange={(e) => setEditDraft((d) => ({ ...d, date: e.target.value }))} className="rounded border border-zinc-300 px-3 py-2 text-sm" />
-                        <input inputMode="numeric" value={editDraft.totalQStr} onChange={(e) => setEditDraft((d) => ({ ...d, totalQStr: e.target.value.replace(/[^\d]/g, "") }))} className="rounded border border-zinc-300 px-3 py-2 text-sm" placeholder="0" />
+                        <input
+                          type="date"
+                          value={editDraft.date}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, date: e.target.value }))}
+                          className="rounded border border-zinc-300 px-3 py-2 text-sm"
+                        />
+                        <input
+                          inputMode="numeric"
+                          value={editDraft.totalQStr}
+                          onChange={(e) =>
+                            setEditDraft((d) => ({ ...d, totalQStr: e.target.value.replace(/[^\d]/g, "") }))
+                          }
+                          className="rounded border border-zinc-300 px-3 py-2 text-sm"
+                          placeholder="0"
+                        />
+                        <input
+                          inputMode="decimal"
+                          value={editDraft.mpqStr}
+                          onChange={(e) =>
+                            setEditDraft((d) => ({ ...d, mpqStr: e.target.value.replace(/[^0-9.]/g, "") }))
+                          }
+                          className="rounded border border-zinc-300 px-3 py-2 text-sm"
+                          placeholder="0"
+                        />
                       </div>
                       <div className="mt-2 flex items-center justify-end gap-2">
-                        <button onClick={() => setEditing(null)} className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm">Cancel</button>
-                        <button onClick={saveEdit} className="inline-flex items-center gap-1 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">Save</button>
+                        <button
+                          onClick={() => setEditing(null)}
+                          className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={saveEdit}
+                          className="inline-flex items-center gap-1 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white"
+                        >
+                          Save
+                        </button>
                       </div>
                     </motion.div>
                   )}

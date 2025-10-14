@@ -13,7 +13,12 @@ const supabase = createClient(
  * GET /api/public/scores?ym=YYYY-MM
  * Returns:
  * {
- *   tests: [{ id, section, test_date }],
+ *   tests: [{
+ *     id, section, test_date,
+ *     total_questions, total_marks, // NEW: for denominator
+ *     // optional helper for clients that read it
+ *     marks_per_question
+ *   }],
  *   marks: [{ test_id, student_id, score }]
  * }
  */
@@ -32,17 +37,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Invalid ym" }, { status: 400 });
     }
 
-    // Use start/end date strings (YYYY-MM-DD)
     const start = new Date(Date.UTC(year, month - 1, 1));
     const end = new Date(Date.UTC(year, month, 1));
-    // Use only date portion (this is safe if test_date column is DATE)
     const startISO = start.toISOString().slice(0, 10);
     const endISO = end.toISOString().slice(0, 10);
 
-    // 1) Tests in the month
+    // 1) Tests in the month — include totals needed for denominator
     const { data: tests, error: tErr } = await supabase
       .from("tests")
-      .select("id, section, test_date")
+      .select("id, section, test_date, total_questions, questions, total_marks")
       .gte("test_date", startISO)
       .lt("test_date", endISO)
       .order("test_date", { ascending: true });
@@ -74,24 +77,41 @@ export async function GET(req: Request) {
       }));
     }
 
-    // Always return stable shape
-    const payload = {
-      tests: (tests ?? []).map((t: any) => ({
+    // Build tests payload with totals
+    const payloadTests = (tests ?? []).map((t: any) => {
+      const tqRaw = Number(t.total_questions ?? t.questions ?? 0);
+      const tmRaw = Number(t.total_marks ?? 0);
+      const total_questions = Number.isFinite(tqRaw) && tqRaw > 0 ? tqRaw : 0;
+      const total_marks = Number.isFinite(tmRaw) && tmRaw > 0 ? tmRaw : 0;
+
+      // helper: expose mpq if derivable (client can also compute this)
+      const marks_per_question =
+        total_questions > 0 && total_marks > 0 ? total_marks / total_questions : null;
+
+      return {
         id: String(t.id ?? ""),
         section: (t.section ?? "").toString(),
         test_date: String(t.test_date ?? ""),
-      })),
+        total_questions,
+        total_marks,
+        // optional, harmless if unused by client
+        marks_per_question,
+      };
+    });
+
+    const payload = {
+      tests: payloadTests,
       marks,
     };
 
-    // Server-side log to help debugging
-    console.log(`[api/public/scores] ym=${ym} -> tests=${payload.tests.length} marks=${payload.marks.length}`);
+    console.log(
+      `[api/public/scores] ym=${ym} -> tests=${payload.tests.length} marks=${payload.marks.length}`
+    );
 
     return new NextResponse(JSON.stringify(payload), {
       status: 200,
       headers: {
         "content-type": "application/json",
-        // short edge cache; adjust as needed
         "cache-control": "public, s-maxage=60, stale-while-revalidate=60",
       },
     });

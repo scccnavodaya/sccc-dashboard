@@ -12,6 +12,10 @@ export type PublicTest = {
   section: "MAT" | "ENGLISH" | "MATHS" | string;
   test_date: string; // normalized field name for consistency
   testDate?: string; // optional camelCase alias for UI compatibility
+  // NEW: surface both total_marks and marks_per_question directly
+  total_marks?: number | null;
+  marks_per_question?: number | null;
+  // Existing: keep max_marks for compatibility with older components/helpers
   max_marks?: number | null;
   total_questions?: number | null;
 };
@@ -38,23 +42,49 @@ function normalizeScores(raw: unknown): ScoresResponse {
   const tests: PublicTest[] = Array.isArray(base?.tests)
     ? base.tests.map((t: any) => {
         const testDateValue = String(t?.test_date ?? t?.testDate ?? t?.date ?? "");
+        const total_questions =
+          t?.total_questions != null
+            ? Number(t.total_questions)
+            : t?.questions != null
+            ? Number(t.questions)
+            : null;
+
+        // Prefer explicit total_marks if present
+        const total_marks =
+          t?.total_marks != null
+            ? Number(t.total_marks)
+            : t?.max_marks != null
+            ? Number(t.max_marks)
+            : null;
+
+        // Pass through marks_per_question if the API provided it
+        const marks_per_question =
+          t?.marks_per_question != null
+            ? Number(t.marks_per_question)
+            : t?.mark_per_question != null
+            ? Number(t.mark_per_question)
+            : t?.mpq != null
+            ? Number(t.mpq)
+            : null;
+
         return {
           id: String(t?.id ?? t?.test_id ?? ""),
           section: (t?.section ?? t?.subject ?? "MAT").toString().toUpperCase(),
           test_date: testDateValue,
           testDate: testDateValue, // ensure both are present
-          max_marks:
-            t?.max_marks != null
-              ? Number(t.max_marks)
-              : t?.total_marks != null
-              ? Number(t.total_marks)
-              : null,
-          total_questions:
-            t?.total_questions != null
-              ? Number(t.total_questions)
-              : t?.questions != null
-              ? Number(t.questions)
-              : null,
+
+          // NEW: expose both explicitly for the UI
+          total_marks: Number.isFinite(total_marks as number) ? (total_marks as number) : null,
+          marks_per_question: Number.isFinite(marks_per_question as number)
+            ? (marks_per_question as number)
+            : null,
+
+          // keep max_marks for backward compatibility with helpers that read it
+          max_marks: Number.isFinite(total_marks as number) ? (total_marks as number) : null,
+
+          total_questions: Number.isFinite(total_questions as number)
+            ? (total_questions as number)
+            : null,
         };
       })
     : [];
@@ -72,7 +102,6 @@ function normalizeScores(raw: unknown): ScoresResponse {
       }))
     : [];
 
-  // Defensive debug (safe if console isn't available)
   try {
     console.debug("[usePublicScores] normalized tests:", tests);
     console.debug("[usePublicScores] normalized marks:", marks);
@@ -83,7 +112,6 @@ function normalizeScores(raw: unknown): ScoresResponse {
 
 // -----------------------------------------------------------------------------
 // SWR Fetcher (SWR v2-compatible)
-// Note: SWR passes the fetcher a single optional param object { signal }
 // -----------------------------------------------------------------------------
 async function swrFetcher(
   key: string,
@@ -97,7 +125,6 @@ async function swrFetcher(
     signal,
   });
 
-  // Parse JSON robustly for better errors and debugging
   let data: any = null;
   try {
     data = await res.json();
@@ -114,7 +141,6 @@ async function swrFetcher(
 
   if (!data || typeof data !== "object") {
     console.error("[usePublicScores] Invalid payload:", data);
-    // return empty shape rather than throwing so UI keeps stable
     return { tests: [], marks: [] };
   }
 
@@ -177,7 +203,6 @@ export function usePublicScores(month: string, opts: Options = {}) {
       }
     })();
 
-    // cleanup must return void
     return () => {
       mounted = false;
     };
